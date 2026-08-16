@@ -32,12 +32,12 @@ print(small[1][:50])
 print(cleaned_text[:500])
 matches = []
 for chunk in small:
-    if "universe" in chunk.lower():
+    if "controller" in chunk.lower():
         matches.append(chunk)
 
 print(len(matches))
 print(matches[0])
-question = "what is the universe made of"
+question = "how long does a controller have to notify a data breach"
 words = question.lower().split()
 print(words)
 score = 0
@@ -59,3 +59,12 @@ all_scores = []
 for pair in scored:
     all_scores.append(pair[0])
 print(all_scores)
+best = 0
+best_chunk = ""
+for pair in scored:
+    if pair[0] > best:
+        best = pair[0]
+        best_chunk = pair[1]
+
+print(best)
+print(best_chunk)
