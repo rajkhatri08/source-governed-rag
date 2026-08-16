@@ -30,3 +30,10 @@ print(len(big))
 print(small[0][-50:])
 print(small[1][:50])
 print(cleaned_text[:500])
+matches = []
+for chunk in small:
+    if "universe" in chunk.lower():
+        matches.append(chunk)
+
+print(len(matches))
+print(matches[0])
