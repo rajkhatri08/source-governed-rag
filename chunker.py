@@ -37,3 +37,25 @@ for chunk in small:
 
 print(len(matches))
 print(matches[0])
+question = "what is the universe made of"
+words = question.lower().split()
+print(words)
+score = 0
+for word in words:
+    if word in small[0].lower():
+        score = score + 1
+print(score)
+scored = []
+for chunk in small:
+    score = 0
+    for word in words:
+        if word in chunk.lower():
+            score = score + 1
+    scored.append((score, chunk))
+
+print(scored[0][0])
+print(scored[5][0])
+all_scores = []
+for pair in scored:
+    all_scores.append(pair[0])
+print(all_scores)
