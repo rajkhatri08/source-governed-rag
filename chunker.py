@@ -1,4 +1,5 @@
 import re
+import chromadb
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import util
 with open("sample.txt", "r") as f:
@@ -82,6 +83,7 @@ print(len(chunk_vectors))
 print(len(chunk_vectors[0]))
 
 
+
 query_vector = model.encode(question)
 similarities = util.cos_sim(query_vector, chunk_vectors)
 
@@ -90,3 +92,20 @@ print(similarities[0][:5])
 best_index = similarities[0].argmax()
 print(similarities[0][best_index])
 print(small[best_index])
+
+
+client = chromadb.Client()
+collection = client.create_collection("gdpr")
+
+ids = []
+for i in range(len(small)):
+    ids.append("chunk_" + str(i))
+
+collection.add(documents=small, ids=ids)
+
+print(collection.count())
+results = collection.query(query_texts=[question], n_results=3)
+
+print(results["ids"])
+print(results["distances"])
+print(results["documents"][0][0][:300])
