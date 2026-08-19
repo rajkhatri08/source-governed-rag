@@ -1,7 +1,12 @@
 import re
 import chromadb
+import os
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from sentence_transformers import util
+print("DOTENV FOUND:", load_dotenv())
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
 with open("sample.txt", "r") as f:
     text = f.read()
 def chunk_text(document,size, overlap):
@@ -109,3 +114,13 @@ results = collection.query(query_texts=[question], n_results=3)
 print(results["ids"])
 print(results["distances"])
 print(results["documents"][0][0][:300])
+from google import genai
+
+genai_client = genai.Client(api_key=api_key)
+
+response = genai_client.models.generate_content(
+    model="gemini-3.6-flash",
+    contents="Say hello in exactly three words."
+)
+
+print(response.text)
