@@ -1,4 +1,5 @@
 import re
+from sentence_transformers import SentenceTransformer
 with open("sample.txt", "r") as f:
     text = f.read()
 def chunk_text(document,size, overlap):
@@ -68,3 +69,10 @@ for pair in scored:
 
 print(best)
 print(best_chunk)
+
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+test = model.encode("hello world")
+print(len(test))
+print(test[:10])
