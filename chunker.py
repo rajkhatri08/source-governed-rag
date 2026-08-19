@@ -76,3 +76,16 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 test = model.encode("hello world")
 print(len(test))
 print(test[:10])
+chunk_vectors = model.encode(small)
+print(len(chunk_vectors))
+print(len(chunk_vectors[0]))
+from sentence_transformers import util
+
+query_vector = model.encode(question)
+similarities = util.cos_sim(query_vector, chunk_vectors)
+
+print(similarities.shape)
+print(similarities[0][:5])
+best_index = similarities[0].argmax()
+print(similarities[0][best_index])
+print(small[best_index])
