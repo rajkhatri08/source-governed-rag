@@ -1,5 +1,6 @@
 import re
 from sentence_transformers import SentenceTransformer
+from sentence_transformers import util
 with open("sample.txt", "r") as f:
     text = f.read()
 def chunk_text(document,size, overlap):
@@ -38,7 +39,7 @@ for chunk in small:
 
 print(len(matches))
 print(matches[0])
-question = "how long does a controller have to notify a data breach"
+question = "what is the deadline for reporting a security incident"
 words = question.lower().split()
 print(words)
 score = 0
@@ -79,7 +80,7 @@ print(test[:10])
 chunk_vectors = model.encode(small)
 print(len(chunk_vectors))
 print(len(chunk_vectors[0]))
-from sentence_transformers import util
+
 
 query_vector = model.encode(question)
 similarities = util.cos_sim(query_vector, chunk_vectors)
