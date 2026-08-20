@@ -21,4 +21,4 @@ def build_index(chunks):
 def search(collection, question, n):
     query_vector = model.encode(question).tolist()
     results = collection.query(query_embeddings=[query_vector], n_results=n)
-    return results
+    return results["documents"][0], results["ids"][0], results["distances"][0]

@@ -15,10 +15,12 @@ cleaned = clean_text(text)
 chunks = chunk_text(cleaned, 300, 50)
 
 collection = build_index(chunks)
+question = "what is the deadline for reporting a security incident"
 
-question = "what is the maximum fine under GDPR"
-results = search(collection, question, 3)
-retrieved = results["documents"][0]
-
-answer = generate_answer(genai_client, question, retrieved)
+chunk_texts, chunk_ids, distances = search(collection, question, 3)
+answer = generate_answer(genai_client, question, chunk_texts)
 print(answer)
+print()
+print("Sources:")
+for i in range(len(chunk_ids)):
+    print(chunk_ids[i], "distance:", round(distances[i], 3))
