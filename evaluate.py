@@ -12,7 +12,7 @@ from eval_questions import QUESTIONS
 
 text = load_document("sample.txt")
 cleaned = clean_text(text)
-chunks = chunk_text(cleaned, 300, 50)
+chunks = chunk_text(cleaned, 1000, 50)
 collection = build_index(chunks)
 
 for question, answerable, source in QUESTIONS:

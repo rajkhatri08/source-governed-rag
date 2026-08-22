@@ -8,9 +8,7 @@ from retrieve import build_index, search
 from eval_questions import QUESTIONS
 
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
-genai_client = genai.Client(api_key=api_key)
-
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 text = load_document("sample.txt")
 cleaned = clean_text(text)
 chunks = chunk_text(cleaned, 1000, 50)
@@ -19,7 +17,7 @@ collection = build_index(chunks)
 question = "do I have the right to know who my data was shared with"
 
 chunk_texts, chunk_ids, distances = search(collection, question, 3)
-answer = generate_answer(genai_client, question, chunk_texts)
+answer = generate_answer(client, question, chunk_texts)
 print(answer)
 print()
 print("Sources:")
