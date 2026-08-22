@@ -25,16 +25,25 @@ collection = build_index(all_chunks, all_meta)
 
 question = "how long do we have to report a data breach"
 
-chunk_texts, chunk_ids, distances, metas = search(collection, question, 3)
+chunk_texts, chunk_ids, distances, metas = search(collection, question, 5)
 
 expired_count = 0
 for m in metas:
     if is_expired(m["review_date"]):
         expired_count = expired_count + 1
 
+unapproved_count = 0
+for m in metas:
+    if m["approved"] == False:
+        unapproved_count = unapproved_count + 1
+
 if expired_count > 0:
     print("WARNING:", expired_count, "of", len(metas), "sources are past their review date")
-    print()
+
+if unapproved_count > 0:
+    print("WARNING:", unapproved_count, "of", len(metas), "sources are not approved")
+
+print()
 
 answer = generate_answer(client, question, chunk_texts)
 print(answer)

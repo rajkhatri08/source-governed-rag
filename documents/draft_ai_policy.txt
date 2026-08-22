@@ -1,0 +1,11 @@
+Draft AI Usage Policy
+Version 0.3 - DRAFT, NOT APPROVED
+
+Section 1. Scope
+This policy governs the use of artificial intelligence systems that process personal data.
+
+Section 2. Data Subject Requests
+Requests relating to automated decision-making must be answered within 14 days of receipt.
+
+Section 3. Breach Notification
+Any breach involving an AI system must be reported to the supervisory authority within 24 hours of discovery.

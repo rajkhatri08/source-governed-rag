@@ -10,5 +10,11 @@
     "version": "1.0",
     "approved": true,
     "review_date": "2023-01-15"
+  },
+  "draft_ai_policy.txt": {
+    "owner": "Technology Risk",
+    "version": "0.3",
+    "approved": false,
+    "review_date": "2027-12-31"
   }
 }
