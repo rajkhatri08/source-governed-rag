@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
 from retrieve import build_index, search
 from generate import generate_answer
-from govern import is_expired, classify
+from govern import is_expired, classify, log_query
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -55,6 +55,8 @@ def query(q: Query):
     tier = classify(distances[0], metas)
     answer = generate_answer(client, q.question, chunk_texts)
 
+    log_query(q.question, tier, chunk_ids, distances, warnings)
+
     return {
         "question": q.question,
         "answer": answer,
@@ -63,6 +65,7 @@ def query(q: Query):
         "sources": chunk_ids,
         "distances": distances
     }
+
 
 @app.get("/documents")
 def documents():

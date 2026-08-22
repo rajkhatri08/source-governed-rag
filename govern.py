@@ -1,4 +1,6 @@
-from datetime import date
+import json
+from datetime import date, datetime
+
 
 
 def is_expired(review_date):
@@ -20,3 +22,33 @@ def classify(distance, metas):
         return "SILVER"
 
     return "GOLD"
+def log_query(question, tier, sources, distances, warnings):
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "question": question,
+        "tier": tier,
+        "sources": sources,
+        "top_distance": distances[0],
+        "warnings": warnings
+    }
+
+    try:
+        with open("audit_log.json", "r") as f:
+            log = json.load(f)
+    except:
+        log = []
+
+    log.append(entry)
+
+    with open("audit_log.json", "w") as f:
+        json.dump(log, f, indent=2)
+
+    return entry
+
+
+def read_log():
+    try:
+        with open("audit_log.json", "r") as f:
+            return json.load(f)
+    except:
+        return []
