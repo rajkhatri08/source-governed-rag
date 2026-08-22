@@ -63,3 +63,18 @@ def query(q: Query):
         "sources": chunk_ids,
         "distances": distances
     }
+
+@app.get("/documents")
+def documents():
+    docs = []
+    for filename in metadata:
+        m = metadata[filename]
+        docs.append({
+            "filename": filename,
+            "owner": m["owner"],
+            "version": m["version"],
+            "approved": m["approved"],
+            "review_date": m["review_date"],
+            "expired": is_expired(m["review_date"])
+        })
+    return {"count": len(docs), "documents": docs}
