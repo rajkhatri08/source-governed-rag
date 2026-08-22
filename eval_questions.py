@@ -76,4 +76,13 @@ QUESTIONS = [
     # "wrong regulation".
     ("what are the strict rules for using website tracking cookies",
      False, "ePrivacy Directive"),
+    # --- Conflicted: multiple sources disagree ---
+    ("how long do we have to report a data breach",
+     True, "CONFLICT: Art 33 (72h) vs retention policy (30d, expired) vs draft AI policy (24h, unapproved)"),
+
+    ("how long do we have to respond to an access request",
+     True, "CONFLICT: Art 12 (1 month) vs retention policy (60 days, expired)"),
+
+    ("how quickly must AI-related data requests be answered",
+     True, "ONLY SOURCE: draft AI policy (14 days, unapproved)"),
 ]
