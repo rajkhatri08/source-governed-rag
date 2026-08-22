@@ -1,3 +1,4 @@
+import json
 import re
 def chunk_text(document,size, overlap):
     if overlap >= size:
@@ -27,3 +28,6 @@ def chunk_by_article(document):
         if stripped:
             chunks.append(stripped)
     return chunks
+def load_metadata(path):
+    with open(path, "r") as f:
+        return json.load(f)

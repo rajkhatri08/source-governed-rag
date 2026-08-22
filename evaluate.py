@@ -11,7 +11,7 @@ from eval_questions import QUESTIONS
 load_dotenv()
 genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-text = load_document("sample.txt")
+text = load_document("documents/gdpr_ch3.txt")
 cleaned = clean_text(text)
 chunks = chunk_by_article(cleaned)
 collection = build_index(chunks)

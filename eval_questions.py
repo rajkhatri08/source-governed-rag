@@ -4,7 +4,7 @@ Evaluation set for the GDPR retrieval pipeline.
 Each entry is (question, should_be_answerable, source).
 
 should_be_answerable is the ground truth: True means the answer exists in
-sample.txt (Articles 12, 15, 17, 33). False means the question is real GDPR
+gdpr_ch3.txt (Articles 12, 15, 17, 33). False means the question is real GDPR
 but lives in an article that is not in the corpus.
 
 source is recorded for diagnosis. When an answerable question fails, the
