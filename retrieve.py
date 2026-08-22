@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-def build_index(chunks, doc_meta):
+def build_index(chunks, metadatas):
     client = chromadb.Client()
     try:
         client.delete_collection("gdpr")
@@ -14,10 +14,8 @@ def build_index(chunks, doc_meta):
     vectors = model.encode(chunks).tolist()
 
     ids = []
-    metadatas = []
     for i in range(len(chunks)):
         ids.append("chunk_" + str(i))
-        metadatas.append(doc_meta)
 
     collection.add(documents=chunks, embeddings=vectors, ids=ids, metadatas=metadatas)
     return collection

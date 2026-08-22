@@ -4,5 +4,11 @@
     "version": "2016/679",
     "approved": true,
     "review_date": "2027-05-25"
+  },
+  "retention_policy_v1.txt": {
+    "owner": "Operations",
+    "version": "1.0",
+    "approved": true,
+    "review_date": "2023-01-15"
   }
 }

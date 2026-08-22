@@ -1,0 +1,11 @@
+Data Retention Policy
+Version 1.0
+
+Section 1. Retention Periods
+Customer transaction records shall be retained for a period of three years from the date of the transaction, after which they must be securely deleted.
+
+Section 2. Breach Notification
+In the event of a personal data breach, the Data Protection Officer must be notified within 30 days of discovery. The DPO will assess whether external notification is required.
+
+Section 3. Access Requests
+Requests from data subjects for access to their personal data will be processed within 60 days of receipt.
