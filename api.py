@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
 from retrieve import build_index, search
 from generate import generate_answer
-from govern import is_expired, classify, log_query
+from govern import is_expired, classify, log_query, read_log
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -81,3 +81,7 @@ def documents():
             "expired": is_expired(m["review_date"])
         })
     return {"count": len(docs), "documents": docs}
+@app.get("/audit")
+def audit():
+    log = read_log()
+    return {"count": len(log), "entries": log}
