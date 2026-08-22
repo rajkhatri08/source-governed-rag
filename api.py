@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
@@ -43,6 +43,9 @@ def health():
 
 @app.post("/query")
 def query(q: Query):
+    if not q.question.strip():
+        raise HTTPException(status_code=400, detail="question cannot be empty")
+
     chunk_texts, chunk_ids, distances, metas = search(collection, q.question, 5)
 
     warnings = []
@@ -53,7 +56,11 @@ def query(q: Query):
             warnings.append("unapproved source: " + m["source"])
 
     tier = classify(distances[0], metas)
-    answer = generate_answer(client, q.question, chunk_texts)
+
+    try:
+        answer = generate_answer(client, q.question, chunk_texts)
+    except Exception:
+        raise HTTPException(status_code=503, detail="model unavailable, please retry")
 
     log_query(q.question, tier, chunk_ids, distances, warnings)
 
@@ -81,6 +88,8 @@ def documents():
             "expired": is_expired(m["review_date"])
         })
     return {"count": len(docs), "documents": docs}
+
+
 @app.get("/audit")
 def audit():
     log = read_log()
