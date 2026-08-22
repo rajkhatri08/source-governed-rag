@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv
 from google import genai
 from generate import generate_answer
-from ingest import load_document, clean_text, chunk_text
+from ingest import load_document, clean_text, chunk_by_article
 from retrieve import build_index, search
 from eval_questions import QUESTIONS
 
@@ -13,7 +13,7 @@ genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 text = load_document("sample.txt")
 cleaned = clean_text(text)
-chunks = chunk_text(cleaned, 1000, 50)
+chunks = chunk_by_article(cleaned)
 collection = build_index(chunks)
 
 try:

@@ -19,3 +19,11 @@ def clean_text(document):
 def load_document(path):
     with open(path, "r") as f:
         return f.read()
+def chunk_by_article(document):
+    parts = re.split(r"(?=Art\. \d+ GDPR)", document)
+    chunks = []
+    for part in parts:
+        stripped = part.strip()
+        if stripped:
+            chunks.append(stripped)
+    return chunks

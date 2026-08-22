@@ -6,7 +6,11 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def build_index(chunks):
     client = chromadb.Client()
-    collection = client.get_or_create_collection("gdpr")
+    try:
+        client.delete_collection("gdpr")
+    except:
+        pass
+    collection = client.create_collection("gdpr")
 
     vectors = model.encode(chunks).tolist()
 
