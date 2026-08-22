@@ -12,14 +12,15 @@ metadata = load_metadata("documents/metadata.json")
 
 all_chunks = []
 all_meta = []
-
 for filename in metadata:
     text = load_document("documents/" + filename)
     cleaned = clean_text(text)
     doc_chunks = chunk_by_article(cleaned)
     for chunk in doc_chunks:
+        chunk_meta = dict(metadata[filename])
+        chunk_meta["source"] = filename
         all_chunks.append(chunk)
-        all_meta.append(metadata[filename])
+        all_meta.append(chunk_meta)
 
 collection = build_index(all_chunks, all_meta)
 
@@ -27,21 +28,14 @@ question = "how long do we have to report a data breach"
 
 chunk_texts, chunk_ids, distances, metas = search(collection, question, 5)
 
-expired_count = 0
 for m in metas:
     if is_expired(m["review_date"]):
-        expired_count = expired_count + 1
+        print("WARNING: expired source -", m["source"], "reviewed", m["review_date"])
 
-unapproved_count = 0
 for m in metas:
     if m["approved"] == False:
-        unapproved_count = unapproved_count + 1
+        print("WARNING: unapproved source -", m["source"], "version", m["version"])
 
-if expired_count > 0:
-    print("WARNING:", expired_count, "of", len(metas), "sources are past their review date")
-
-if unapproved_count > 0:
-    print("WARNING:", unapproved_count, "of", len(metas), "sources are not approved")
 
 print()
 
