@@ -57,13 +57,15 @@ def query(q: Query):
     chunk_texts, chunk_ids, distances, metas = search(collection, q.question, 5)
 
     warnings = []
-    for m in metas:
-        if is_expired(m["review_date"]):
-            warnings.append("expired source: " + m["source"])
-        if m["approved"] == False:
-            warnings.append("unapproved source: " + m["source"])
+    for i in range(len(metas)):
+        if distances[i] < 1.2:
+            m = metas[i]
+            if is_expired(m["review_date"]):
+                warnings.append("expired source: " + m["source"])
+            if m["approved"] == False:
+                warnings.append("unapproved source: " + m["source"])
 
-    tier = classify(distances[0], metas)
+    tier = classify(distances[0], metas, distances)
 
     try:
         answer = generate_answer(client, q.question, chunk_texts)
