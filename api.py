@@ -55,25 +55,46 @@ def query(q: Query):
     if not q.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
 
-    chunk_texts, chunk_ids, distances, metas = search(collection, q.question, 5)
+    all_texts, all_ids, all_distances, all_metas = search(collection, q.question, 5)
+
+    chunk_texts = []
+    chunk_ids = []
+    distances = []
+    metas = []
+    for i in range(len(all_ids)):
+        if all_distances[i] < 1.2:
+            chunk_texts.append(all_texts[i])
+            chunk_ids.append(all_ids[i])
+            distances.append(all_distances[i])
+            metas.append(all_metas[i])
+
+    if len(chunk_texts) == 0:
+        log_query_db(q.question, "BRONZE", "no relevant source in the corpus", [], [0.0], [])
+        return {
+            "question": q.question,
+            "answer": "No sufficiently relevant source found.",
+            "tier": "BRONZE",
+            "reason": "no relevant source in the corpus",
+            "warnings": [],
+            "sources": [],
+            "distances": []
+        }
 
     warnings = []
-    for i in range(len(metas)):
-        if distances[i] < 1.2:
-            m = metas[i]
-            if is_expired(m["review_date"]):
-                warnings.append("expired source: " + m["source"])
-            if m["approved"] == False:
-                warnings.append("unapproved source: " + m["source"])
+    for m in metas:
+        if is_expired(m["review_date"]):
+            warnings.append("expired source: " + m["source"])
+        if m["approved"] == False:
+            warnings.append("unapproved source: " + m["source"])
 
     try:
         answer = generate_answer(client, q.question, chunk_texts)
     except Exception:
         raise HTTPException(status_code=503, detail="model unavailable, please retry")
 
-    tier, reason = classify(distances[0], metas, distances, answer)
+    tier, reason = classify(metas, distances, answer)
 
-    log_query_db(q.question, tier, chunk_ids, distances, warnings)
+    log_query_db(q.question, tier, reason, chunk_ids, distances, warnings)
 
     return {
         "question": q.question,
