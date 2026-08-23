@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
 from retrieve import build_index, search
 from generate import generate_answer
-from govern import is_expired, classify, log_query, read_log
+from govern import is_expired, classify
+from db import log_query_db, read_log_db
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -62,7 +63,7 @@ def query(q: Query):
     except Exception:
         raise HTTPException(status_code=503, detail="model unavailable, please retry")
 
-    log_query(q.question, tier, chunk_ids, distances, warnings)
+    log_query_db(q.question, tier, chunk_ids, distances, warnings)
 
     return {
         "question": q.question,
@@ -92,5 +93,5 @@ def documents():
 
 @app.get("/audit")
 def audit():
-    log = read_log()
+    log = read_log_db()
     return {"count": len(log), "entries": log}
