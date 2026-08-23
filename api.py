@@ -9,6 +9,7 @@ from retrieve import build_index, search
 from generate import generate_answer
 from govern import is_expired, classify
 from db import log_query_db, read_log_db
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -31,6 +32,12 @@ for filename in metadata:
 collection = build_index(all_chunks, all_meta)
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class Query(BaseModel):
