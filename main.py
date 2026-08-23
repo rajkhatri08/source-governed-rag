@@ -37,7 +37,7 @@ for m in metas:
     if m["approved"] == False:
         print("WARNING: unapproved source -", m["source"], "version", m["version"])
 
-tier = classify(distances[0], metas)
+tier, reason = classify(distances[0], metas, distances)
 print("TIER:", tier)
 print()
 

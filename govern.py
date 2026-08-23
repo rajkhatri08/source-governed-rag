@@ -5,7 +5,10 @@ def is_expired(review_date):
     return date.fromisoformat(review_date) < date.today()
 
 
-def classify(distance, metas, distances):
+def classify(distance, metas, distances, answer):
+    if "don't know" in answer.lower():
+        return "BRONZE", "no answer found in the available sources"
+
     relevant = []
     for i in range(len(metas)):
         if distances[i] < 1.2:
@@ -13,16 +16,16 @@ def classify(distance, metas, distances):
 
     for m in relevant:
         if m["approved"] == False:
-            return "BRONZE"
+            return "BRONZE", "source not approved: " + m["source"]
 
     for m in relevant:
         if is_expired(m["review_date"]):
-            return "SILVER"
+            return "SILVER", "source past review date: " + m["source"]
 
     if distance > 1.1:
-        return "BRONZE"
+        return "BRONZE", "no strong match in the corpus"
 
     if distance > 0.95:
-        return "SILVER"
+        return "SILVER", "moderate match only"
 
-    return "GOLD"
+    return "GOLD", "strong match from an approved, current source"

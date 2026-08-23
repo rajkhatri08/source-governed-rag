@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
@@ -9,7 +10,6 @@ from retrieve import build_index, search
 from generate import generate_answer
 from govern import is_expired, classify
 from db import log_query_db, read_log_db
-from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -32,6 +32,7 @@ for filename in metadata:
 collection = build_index(all_chunks, all_meta)
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -65,12 +66,12 @@ def query(q: Query):
             if m["approved"] == False:
                 warnings.append("unapproved source: " + m["source"])
 
-    tier = classify(distances[0], metas, distances)
-
     try:
         answer = generate_answer(client, q.question, chunk_texts)
     except Exception:
         raise HTTPException(status_code=503, detail="model unavailable, please retry")
+
+    tier, reason = classify(distances[0], metas, distances, answer)
 
     log_query_db(q.question, tier, chunk_ids, distances, warnings)
 
@@ -78,6 +79,7 @@ def query(q: Query):
         "question": q.question,
         "answer": answer,
         "tier": tier,
+        "reason": reason,
         "warnings": warnings,
         "sources": chunk_ids,
         "distances": distances
