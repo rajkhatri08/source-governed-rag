@@ -5,3 +5,4 @@ google-genai
 chromadb
 sqlalchemy
 psycopg2-binary
+pypdf
