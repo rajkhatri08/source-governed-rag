@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from ingest import load_document, clean_text, chunk_by_article
+from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_by_article
 from retrieve import build_index, search
 from generate import generate_answer
 from govern import is_expired, classify
@@ -20,7 +20,10 @@ all_chunks = []
 all_meta = []
 
 for d in docs:
-    text = load_document("documents/" + d["filename"])
+    if d["filename"].endswith(".pdf"):
+        text = clean_pdf_text(load_pdf("documents/" + d["filename"]))
+    else:
+        text = load_document("documents/" + d["filename"])
     cleaned = clean_text(text)
     doc_chunks = chunk_by_article(cleaned)
     for chunk in doc_chunks:
