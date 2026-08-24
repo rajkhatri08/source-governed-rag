@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from ingest import load_document, clean_text, chunk_by_article, load_metadata
+from ingest import load_document, clean_text, chunk_by_article
 from retrieve import build_index, search
 from generate import generate_answer
 from govern import is_expired, classify
@@ -14,18 +14,23 @@ from db import log_query_db, read_log_db, read_documents, set_approved
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-metadata = load_metadata("documents/metadata.json")
+docs = read_documents()
 
 all_chunks = []
 all_meta = []
 
-for filename in metadata:
-    text = load_document("documents/" + filename)
+for d in docs:
+    text = load_document("documents/" + d["filename"])
     cleaned = clean_text(text)
     doc_chunks = chunk_by_article(cleaned)
     for chunk in doc_chunks:
-        chunk_meta = dict(metadata[filename])
-        chunk_meta["source"] = filename
+        chunk_meta = {
+            "source": d["filename"],
+            "owner": d["owner"],
+            "version": d["version"],
+            "approved": d["approved"],
+            "review_date": d["review_date"]
+        }
         all_chunks.append(chunk)
         all_meta.append(chunk_meta)
 
@@ -116,6 +121,22 @@ def documents():
     for d in docs:
         d["expired"] = is_expired(d["review_date"])
     return {"count": len(docs), "documents": docs}
+
+
+@app.post("/documents/{filename}/approve")
+def approve(filename: str):
+    found = set_approved(filename, True)
+    if not found:
+        raise HTTPException(status_code=404, detail="document not found")
+    return {"filename": filename, "approved": True}
+
+
+@app.post("/documents/{filename}/unapprove")
+def unapprove(filename: str):
+    found = set_approved(filename, False)
+    if not found:
+        raise HTTPException(status_code=404, detail="document not found")
+    return {"filename": filename, "approved": False}
 
 
 @app.get("/audit")
