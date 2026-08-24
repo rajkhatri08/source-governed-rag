@@ -9,7 +9,7 @@ from ingest import load_document, clean_text, chunk_by_article, load_metadata
 from retrieve import build_index, search
 from generate import generate_answer
 from govern import is_expired, classify
-from db import log_query_db, read_log_db
+from db import log_query_db, read_log_db, read_documents, set_approved
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -112,17 +112,9 @@ def query(q: Query):
 
 @app.get("/documents")
 def documents():
-    docs = []
-    for filename in metadata:
-        m = metadata[filename]
-        docs.append({
-            "filename": filename,
-            "owner": m["owner"],
-            "version": m["version"],
-            "approved": m["approved"],
-            "review_date": m["review_date"],
-            "expired": is_expired(m["review_date"])
-        })
+    docs = read_documents()
+    for d in docs:
+        d["expired"] = is_expired(d["review_date"])
     return {"count": len(docs), "documents": docs}
 
 

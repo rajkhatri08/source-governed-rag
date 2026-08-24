@@ -1,7 +1,7 @@
 import os
 import json
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
@@ -25,6 +25,17 @@ class AuditEntry(Base):
     top_distance = Column(Float)
     sources = Column(Text)
     warnings = Column(Text)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(200), unique=True, nullable=False)
+    owner = Column(String(100))
+    version = Column(String(50))
+    approved = Column(Boolean, default=False)
+    review_date = Column(String(20))
 
 
 def init_db():
@@ -63,3 +74,29 @@ def read_log_db():
         })
     session.close()
     return result
+
+
+def read_documents():
+    session = Session()
+    rows = session.query(Document).all()
+    result = []
+    for r in rows:
+        result.append({
+            "filename": r.filename,
+            "owner": r.owner,
+            "version": r.version,
+            "approved": r.approved,
+            "review_date": r.review_date
+        })
+    session.close()
+    return result
+
+
+def set_approved(filename, approved):
+    session = Session()
+    doc = session.query(Document).filter(Document.filename == filename).first()
+    if doc:
+        doc.approved = approved
+        session.commit()
+    session.close()
+    return doc is not None
