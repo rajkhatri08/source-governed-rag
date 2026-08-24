@@ -3,3 +3,4 @@ __pycache__/
 .idea/
 .env
 cache.json
+audit_log.json
