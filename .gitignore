@@ -4,3 +4,4 @@ __pycache__/
 .env
 cache.json
 audit_log.json
+.DS_Store
