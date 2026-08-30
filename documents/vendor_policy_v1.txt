@@ -1,0 +1,8 @@
+Art. 100 GDPR
+Third Party Vendor Assessment
+
+1. All vendors processing personal data must complete a security assessment before contract signature.
+
+2. Vendor assessments must be renewed every 12 months.
+
+3. Vendors handling special category data require board-level approval.
