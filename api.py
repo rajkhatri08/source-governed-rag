@@ -10,7 +10,7 @@ from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_by
 from retrieve import build_index, search, add_to_index
 from generate import generate_answer
 from govern import is_expired, classify
-from db import log_query_db, read_log_db, read_documents, set_approved, add_document
+from db import log_query_db, read_log_db, read_documents, set_approved, set_retired, add_document
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -21,6 +21,8 @@ all_chunks = []
 all_meta = []
 
 for d in docs:
+    if d["retired"]:
+        continue
     if d["filename"].endswith(".pdf"):
         text = clean_pdf_text(load_pdf("documents/" + d["filename"]))
     else:
@@ -191,6 +193,14 @@ def unapprove(filename: str):
     if not found:
         raise HTTPException(status_code=404, detail="document not found")
     return {"filename": filename, "approved": False}
+
+
+@app.post("/documents/{filename}/retire")
+def retire(filename: str):
+    found = set_retired(filename, True)
+    if not found:
+        raise HTTPException(status_code=404, detail="document not found")
+    return {"filename": filename, "retired": True}
 
 
 @app.get("/audit")

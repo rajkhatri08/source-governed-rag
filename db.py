@@ -35,6 +35,7 @@ class Document(Base):
     owner = Column(String(100))
     version = Column(String(50))
     approved = Column(Boolean, default=False)
+    retired = Column(Boolean, default=False)
     review_date = Column(String(20))
 
 
@@ -86,6 +87,7 @@ def read_documents():
             "owner": r.owner,
             "version": r.version,
             "approved": r.approved,
+            "retired": r.retired,
             "review_date": r.review_date
         })
     session.close()
@@ -102,6 +104,16 @@ def set_approved(filename, approved):
     return doc is not None
 
 
+def set_retired(filename, retired):
+    session = Session()
+    doc = session.query(Document).filter(Document.filename == filename).first()
+    if doc:
+        doc.retired = retired
+        session.commit()
+    session.close()
+    return doc is not None
+
+
 def add_document(filename, owner, version, review_date):
     session = Session()
     existing = session.query(Document).filter(Document.filename == filename).first()
@@ -113,6 +125,7 @@ def add_document(filename, owner, version, review_date):
         owner=owner,
         version=version,
         approved=False,
+        retired=False,
         review_date=review_date
     )
     session.add(doc)
