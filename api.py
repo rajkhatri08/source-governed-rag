@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from dotenv import load_dotenv
 from google import genai
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
@@ -136,9 +137,18 @@ async def upload(
 ):
     global chunk_counter
 
-    filename = file.filename
-    path = "documents/" + filename
+    try:
+        date.fromisoformat(review_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="review_date must be YYYY-MM-DD")
 
+    filename = file.filename
+
+    added = add_document(filename, owner, version, review_date)
+    if not added:
+        raise HTTPException(status_code=409, detail="document already exists")
+
+    path = "documents/" + filename
     contents = await file.read()
     with open(path, "wb") as f:
         f.write(contents)
@@ -150,10 +160,6 @@ async def upload(
 
     cleaned = clean_text(text)
     doc_chunks = chunk_by_article(cleaned)
-
-    added = add_document(filename, owner, version, review_date)
-    if not added:
-        raise HTTPException(status_code=409, detail="document already exists")
 
     metas = []
     for chunk in doc_chunks:
