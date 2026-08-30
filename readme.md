@@ -122,6 +122,16 @@ The endpoint validates the review date and claims the filename in the database *
 
 ---
 
+## Retirement, not deletion
+
+A document can be retired, which removes it from the index so it can no longer answer questions, while leaving the row and the file in place.
+
+Hard-deleting would break the audit trail. Entries in `audit_log` name their sources; delete the document and past entries reference something that no longer exists, with no way to know what it said. For a system whose premise is defensibility, destroying the record is the wrong default.
+
+Retirement takes effect on restart, and is currently one-way — there is no reinstate endpoint.
+
+---
+
 ## Why distance thresholds were removed
 
 The tier originally included similarity thresholds — above 1.1 BRONZE, above 0.95 SILVER. Reviewing the audit log showed misclassifications in both directions, so the thresholds were calibrated against the labelled set rather than defended by intuition.
@@ -200,6 +210,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | POST | `/upload` | Upload a `.txt` or `.pdf`; indexed immediately, unapproved by default |
 | POST | `/documents/{filename}/approve` | Approve a document |
 | POST | `/documents/{filename}/unapprove` | Revoke approval |
+| POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
 | GET | `/audit` | Full audit log, newest first |
 
 Errors: `400` on an empty question or a malformed review date, `404` on an unknown document, `409` on a duplicate filename, `503` when the model is unavailable.
@@ -210,7 +221,9 @@ Errors: `400` on an empty question or a malformed review date, `404` on an unkno
 
 These are real and worth stating plainly.
 
-**Approval changes require a restart to affect retrieval.** Uploaded documents are indexed immediately and searchable straight away. But approving or revoking a document writes to Postgres without updating the chunk metadata already held in the index, so the tier assigned to answers from that document does not change until the service restarts.
+**Governance changes require a restart to affect retrieval.** Uploaded documents are indexed immediately and searchable straight away. But approving, revoking or retiring a document writes to Postgres without updating the chunk metadata already held in the index, so the change does not affect answers until the service restarts. Making it immediate would need chunk ids tracked per document so the affected entries could be updated or deleted in place.
+
+**Retirement is one-way.** There is no reinstate endpoint. A retired document can only be brought back by editing the database directly.
 
 **The document row is created before the file is written.** If the write failed, the database would hold a row pointing at a missing file. Doing this properly needs a transaction spanning Postgres and the filesystem, which is awkward when only one of them supports transactions.
 
@@ -225,6 +238,8 @@ These are real and worth stating plainly.
 **The chunker is GDPR-specific.** It matches `Art. N GDPR` headings. A document without them becomes a single chunk. A general system needs structure detection per document type with a character-based fallback.
 
 **Chunk ids are assigned from a counter held in process memory.** It survives as long as the process does, but a restart rebuilds the index from scratch, and concurrent uploads could collide. UUIDs would remove the coordination entirely.
+
+**Schema changes are applied by hand.** The `retired` column was added with a manual `ALTER TABLE` against each database. A migration tool such as Alembic is what this needs before there is real data to protect.
 
 **Cold starts.** Render's free tier sleeps after 15 minutes; the first request afterwards takes 30–50 seconds.
 
