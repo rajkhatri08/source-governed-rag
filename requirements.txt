@@ -6,3 +6,4 @@ chromadb
 sqlalchemy
 psycopg2-binary
 pypdf
+python-multipart

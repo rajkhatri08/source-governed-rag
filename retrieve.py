@@ -20,3 +20,12 @@ def build_index(chunks, metadatas):
 def search(collection, question, n):
     results = collection.query(query_texts=[question], n_results=n)
     return results["documents"][0], results["ids"][0], results["distances"][0], results["metadatas"][0]
+
+
+def add_to_index(collection, chunks, metadatas, start_id):
+    ids = []
+    for i in range(len(chunks)):
+        ids.append("chunk_" + str(start_id + i))
+
+    collection.add(documents=chunks, metadatas=metadatas, ids=ids)
+    return len(chunks)

@@ -1,0 +1,8 @@
+Art. 99 GDPR
+Incident Escalation
+
+1. All security incidents must be escalated to the Head of Information Security within 4 hours of detection.
+
+2. Incidents involving customer payment data must additionally be reported to the Payments Risk Committee within 2 hours.
+
+3. A written incident report must be filed within 5 working days.

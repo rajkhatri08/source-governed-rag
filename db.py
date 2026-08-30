@@ -100,3 +100,22 @@ def set_approved(filename, approved):
         session.commit()
     session.close()
     return doc is not None
+
+
+def add_document(filename, owner, version, review_date):
+    session = Session()
+    existing = session.query(Document).filter(Document.filename == filename).first()
+    if existing:
+        session.close()
+        return False
+    doc = Document(
+        filename=filename,
+        owner=owner,
+        version=version,
+        approved=False,
+        review_date=review_date
+    )
+    session.add(doc)
+    session.commit()
+    session.close()
+    return True
