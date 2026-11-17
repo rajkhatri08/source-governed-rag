@@ -118,7 +118,7 @@ Documents can be uploaded at runtime through the dashboard or the API, as plain 
 
 PDF text is extracted with `pypdf` and passed through a PDF-specific cleaning stage before the general one. That stage normalises ligatures (`ﬁ` → `fi`, `ﬂ` → `fl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
 
-The endpoint validates the review date and claims the filename in the database **before** writing anything to disk, so a rejected upload leaves no stray file and does no extraction work.
+The endpoint validates the review date and claims the filename in the database **before** writing anything to disk, so a rejected upload leaves no stray file and does no extraction work. The filename must be a plain name: one that is empty, starts with `.`, or contains `/` or `\` is rejected, so an upload cannot write outside `documents/`.
 
 ---
 
@@ -204,7 +204,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness check |
+| GET | `/health` | Liveness check; also lists documents skipped at startup because their file was missing or unreadable (`skipped_documents`) |
 | POST | `/query` | Ask a question; returns answer, tier, reason, warnings, sources |
 | GET | `/documents` | Document inventory with computed expiry status |
 | POST | `/upload` | Upload a `.txt` or `.pdf`; indexed immediately, unapproved by default |
@@ -213,7 +213,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
 | GET | `/audit` | Full audit log, newest first |
 
-Errors: `400` on an empty question or a malformed review date, `404` on an unknown document, `409` on a duplicate filename, `503` when the model is unavailable.
+Errors: `400` on an empty question, a malformed review date or a filename that isn't a plain name, `404` on an unknown document, `409` on a duplicate filename, `503` when the model is unavailable.
 
 ---
 
@@ -226,6 +226,8 @@ These are real and worth stating plainly.
 **Retirement is one-way.** There is no reinstate endpoint. A retired document can only be brought back by editing the database directly.
 
 **The document row is created before the file is written.** If the write failed, the database would hold a row pointing at a missing file. Doing this properly needs a transaction spanning Postgres and the filesystem, which is awkward when only one of them supports transactions.
+
+**Uploads don't survive a restart on the hosted demo.** Render's free instance has an ephemeral disk, so an uploaded file is lost when the service restarts or spins down, while its row stays in Postgres. Startup skips any document whose file is missing or unreadable, logs a warning and lists it under `skipped_documents` in `/health`. The service stays up, but the skipped document is no longer searchable. The fix is to store each document's extracted text in Postgres rather than on disk.
 
 **PDF cleaning is heuristic.** The line-joining regex uses punctuation and capitalisation to guess where a sentence continues across a line break. It works on the documents tested, but it is a guess, not a rule, and it will misjudge some layouts.
 

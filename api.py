@@ -1,10 +1,12 @@
 import os
+import logging
 from datetime import date
 from dotenv import load_dotenv
 from google import genai
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pypdf.errors import PyPdfError
 
 from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_by_article
 from retrieve import build_index, search, add_to_index
@@ -13,22 +15,29 @@ from govern import is_expired, classify
 from db import log_query_db, read_log_db, read_documents, set_approved, set_retired, add_document
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 docs = read_documents()
 
 all_chunks = []
 all_meta = []
+skipped_documents = []
 
 for d in docs:
     if d["retired"]:
         continue
-    if d["filename"].endswith(".pdf"):
-        text = clean_pdf_text(load_pdf("documents/" + d["filename"]))
-    else:
-        text = load_document("documents/" + d["filename"])
-    cleaned = clean_text(text)
-    doc_chunks = chunk_by_article(cleaned)
+    try:
+        if d["filename"].endswith(".pdf"):
+            text = clean_pdf_text(load_pdf("documents/" + d["filename"]))
+        else:
+            text = load_document("documents/" + d["filename"])
+        cleaned = clean_text(text)
+        doc_chunks = chunk_by_article(cleaned)
+    except (OSError, UnicodeDecodeError, PyPdfError) as e:
+        logger.warning(f"skipping {d['filename']} at startup: {type(e).__name__}: {e}")
+        skipped_documents.append(d["filename"])
+        continue
     for chunk in doc_chunks:
         chunk_meta = {
             "source": d["filename"],
@@ -62,7 +71,7 @@ class Query(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "skipped_documents": skipped_documents}
 
 
 @app.post("/query")
@@ -145,6 +154,8 @@ async def upload(
         raise HTTPException(status_code=400, detail="review_date must be YYYY-MM-DD")
 
     filename = file.filename
+    if not filename or filename.startswith(".") or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="filename must be a plain file name")
 
     added = add_document(filename, owner, version, review_date)
     if not added:

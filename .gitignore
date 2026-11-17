@@ -5,3 +5,4 @@ __pycache__/
 cache.json
 audit_log.json
 .DS_Store
+UPGRADE_PLAN.md
