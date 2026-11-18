@@ -41,6 +41,8 @@ Startup (when `api.py` is imported): each active document's file in `documents/`
 | `migrate.py` | One-off seed of `documents` from `documents/metadata.json` |
 | `documents/` | Seed documents. `metadata.json` covers only the first three |
 | `readme.md` | Public README (lowercase filename) |
+| `requirements-dev.txt` | Test tools on top of `requirements.txt`: pinned `pytest` and `httpx` (FastAPI's `TestClient` needs httpx). Render installs only `requirements.txt` |
+| `docs/decisions.md` | Decision log, oldest first. Every task appends an entry (see "Working on a task") |
 | `audit_log.json`, `cache.json` | Local leftovers, gitignored. Don't use |
 | `UPGRADE_PLAN.md` | Task list. Local only, gitignored, never commit |
 
@@ -50,6 +52,7 @@ Startup (when `api.py` is imported): each active document's file in `documents/`
 source .venv/bin/activate
 uvicorn api:app --reload                       # http://127.0.0.1:8000 (docs at /docs)
 cd ../compliance-dashboard && npm run dev      # http://localhost:3000
+pip install -r requirements-dev.txt            # app + test tools (pytest, httpx)
 pytest                                         # from P0.6
 ```
 
