@@ -1,21 +1,23 @@
 from eval_questions import QUESTIONS
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
-from retrieve import build_index, search
+from retrieve import build_index, make_chunk_id, search
 
 metadata = load_metadata("documents/metadata.json")
 
+all_ids = []
 all_chunks = []
 all_meta = []
 for filename in metadata:
     text = load_document("documents/" + filename)
     cleaned = clean_text(text)
-    for chunk in chunk_by_article(cleaned):
+    for index, chunk in enumerate(chunk_by_article(cleaned)):
         cm = dict(metadata[filename])
         cm["source"] = filename
+        all_ids.append(make_chunk_id(filename, index, chunk))
         all_chunks.append(chunk)
         all_meta.append(cm)
 
-collection = build_index(all_chunks, all_meta)
+collection = build_index(all_ids, all_chunks, all_meta)
 
 results = []
 for question, answerable, source in QUESTIONS:

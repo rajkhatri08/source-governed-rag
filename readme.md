@@ -50,15 +50,17 @@ FastAPI (Render)
 4. Build warnings from the surviving chunks' metadata
 5. Generate an answer from those chunks only, with an instruction to refuse if the context does not contain it
 6. Classify GOLD / SILVER / BRONZE
-7. Write an audit row to Postgres
+7. Write an audit row to Postgres: the question, the answer, tier, reason and warnings, and every chunk the answer was drawn from, with its id, source document, content hash and distance
 8. Return answer, tier, reason, warnings, sources and distances
+
+A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of its text}`. It comes from the chunk itself, so the same text gets the same id after every restart, and the hash in an audit row shows exactly which text an answer used.
 
 ### Modules
 
 | File | Responsibility |
 |---|---|
 | `ingest.py` | Load text and PDF documents, clean, chunk |
-| `retrieve.py` | Build the vector index, search, add to a live index |
+| `retrieve.py` | Build the vector index, search, add to a live index; content-derived chunk ids |
 | `generate.py` | Prompt construction and the model call |
 | `govern.py` | Expiry check and tier classification |
 | `db.py` | SQLAlchemy models, audit log, document metadata |
@@ -66,7 +68,9 @@ FastAPI (Render)
 | `pipeline.py` | The question-answering pipeline, shared by the API and the evaluation |
 | `evals/` | Evaluation v2: 48 pre-registered questions, the harness and its scoring |
 | `calibrate.py` | Threshold calibration against the labelled set |
-| `migrate.py` | One-off migration of document metadata into Postgres |
+| `migrations/`, `alembic.ini` | Alembic schema migrations; `migrations/baseline_schema.txt` is the schema revision 0001 creates |
+| `print_schema.py` | Read-only schema print, to compare a database with the baseline before stamping it |
+| `migrate.py` | One-off load of document metadata into Postgres |
 
 ---
 
@@ -184,12 +188,14 @@ GOOGLE_API_KEY=your_gemini_key
 DATABASE_URL=postgresql://user:password@localhost:5432/compliance
 ```
 
-Initialise the database and load document metadata:
+Create the tables with the migrations, then load document metadata:
 
 ```bash
-python -c "from db import init_db; init_db()"
+alembic upgrade head
 python migrate.py
 ```
+
+Every schema change is an Alembic migration in `migrations/versions/`. `alembic upgrade head` applies the ones a database hasn't had yet; `alembic upgrade 0001:head --sql` prints their SQL without connecting. A `DATABASE_URL` set in the shell takes precedence over `.env`. The migrations only add columns or tables, so the code already deployed keeps working while a database is migrated ahead of a deploy.
 
 Run the API:
 
@@ -214,7 +220,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | POST | `/documents/{filename}/approve` | Approve a document |
 | POST | `/documents/{filename}/unapprove` | Revoke approval |
 | POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
-| GET | `/audit` | Full audit log, newest first |
+| GET | `/audit` | Full audit log, newest first: each row's answer and the exact chunks it used |
 
 Errors: `400` on an empty question, a malformed review date or a filename that isn't a plain name, `404` on an unknown document, `409` on a duplicate filename, `503` when the model is unavailable.
 
@@ -242,9 +248,9 @@ These are real and worth stating plainly.
 
 **Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 
-**Chunk ids are assigned from a counter held in process memory.** It survives as long as the process does, but a restart rebuilds the index from scratch, and concurrent uploads could collide. UUIDs would remove the coordination entirely.
+**Audit rows written before the migration are incomplete.** They have no answer and no chunk hashes, and their chunk ids are the old positional ones (`chunk_5` meant whatever was sixth when the index was built), which no longer resolve. Their times are in the local time of whichever machine wrote them (IST or UTC) with no zone recorded, and a question with no relevant source shows a distance of `0.0` instead of none. They are left as they were written: the audit log is append-only.
 
-**Schema changes are applied by hand.** The `retired` column was added with a manual `ALTER TABLE` against each database. A migration tool such as Alembic is what this needs before there is real data to protect.
+**An audit row identifies the text it used but doesn't keep it.** The content hash proves which text an answer was drawn from. If a document's text later changes, the hash shows that it changed, not what it said before. Keeping that would need a history of document versions.
 
 **Cold starts.** Render's free tier sleeps after 15 minutes; the first request afterwards takes 30–50 seconds.
 

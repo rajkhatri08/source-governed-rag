@@ -2,6 +2,7 @@
 
 Run from the repo root: python -m evals.seed_eval_db
 Safe to run again: it inserts or updates those three rows and never deletes anything.
+The tables come from the migrations, not from this script: run `alembic -x db=eval upgrade head` first.
 """
 from evals.eval_db import use_eval_database
 
@@ -21,7 +22,6 @@ FIXED_DOCUMENTS = [
 
 def main() -> None:
     print(f"eval database host: {EVAL_HOST}")
-    db.init_db()  # creates the tables in the new eval database; existing tables are left alone
 
     session = db.Session()
     try:

@@ -1,0 +1,21 @@
+table audit_log
+  column id: INTEGER, nullable=False, default=nextval('audit_log_id_seq'::regclass)
+  column question: TEXT, nullable=False, default=None
+  column reason: TEXT, nullable=True, default=None
+  column sources: TEXT, nullable=True, default=None
+  column tier: VARCHAR(10), nullable=False, default=None
+  column timestamp: TIMESTAMP WITHOUT TIME ZONE, nullable=True, default=None
+  column top_distance: DOUBLE PRECISION, nullable=True, default=None
+  column warnings: TEXT, nullable=True, default=None
+  primary key: ['id']
+table documents
+  column approved: BOOLEAN, nullable=True, default=None
+  column filename: VARCHAR(200), nullable=False, default=None
+  column id: INTEGER, nullable=False, default=nextval('documents_id_seq'::regclass)
+  column owner: VARCHAR(100), nullable=True, default=None
+  column retired: BOOLEAN, nullable=True, default=None
+  column review_date: VARCHAR(20), nullable=True, default=None
+  column version: VARCHAR(50), nullable=True, default=None
+  primary key: ['id']
+  unique documents_filename_key: ['filename']
+  index documents_filename_key: ['filename'], unique=True

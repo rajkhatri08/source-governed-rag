@@ -310,3 +310,64 @@ Commit: the one that adds this entry.
 - `calibrate.py` printed the same result as before (1.02, 17 of 23, 73.9%).
 - **Evaluation v2, 20 Nov** (`evals/results/2026-11-20-p0.5.json`). The questions, prompt, model, cutoff and top-5 are the same as in the baseline; only the corpus changed. Refusal 36 → 41 of 48, facts 17 → 26 of 34, tier 28 → 31 of 48, sources 12 → 22 of 34, 0 failed calls. Group by group in `docs/eval/p0.5.md`. The paraphrase group's tier fell from 4/8 to 2/8.
 - **The crowding check** ranked all 26 chunks for every question, with no model calls. No expected source and no answer-holding chunk was under the cutoff but below 5th, before or after. Its per-question results match both eval runs row by row on the sources metric.
+
+---
+
+## 20 Nov 2026 · P0.2: migrations and a traceable audit trail
+
+Commit: the one that adds this entry.
+
+**Context.** Three gaps made the audit trail hard to rely on. The schema was changed by hand: `retired` was added with an `ALTER TABLE` typed into each database, and nothing recorded which schema a database was on. Chunk ids were positions (`chunk_0`, `chunk_1` … in load order, then an in-memory counter for uploads), so after a restart or a document change an id in an old audit row could point at different text or at nothing, and two concurrent uploads could take the same number. And the audit row recorded neither the answer nor the text it was drawn from. When no chunk passed the filter it stored a top distance of `0.0`, which means a perfect match, the opposite of what happened.
+
+**Decision.**
+- **Alembic for every schema change.** `migrations/env.py` builds its engine from `os.getenv("DATABASE_URL")`, so a value set in the shell wins over `.env` (python-dotenv never overrides a variable that is already set). It never passes the URL through Alembic's config, where ConfigParser would read the `%` of a percent-encoded password as interpolation. It stops if the variable is unset and logs `host/database` before connecting. `alembic -x db=eval …` targets `compliance_eval` through the existing `use_eval_database()` checks. `alembic.ini` deliberately has no `sqlalchemy.url`.
+- **Revision 0001 is the schema as it was**: `audit_log` and `documents`, including `retired`. Existing databases join with `alembic stamp 0001`, after their schema has been compared with what 0001 creates. New databases run `alembic upgrade head`. `init_db()` (SQLAlchemy's `create_all`) is deleted.
+- **Revision 0002 is additive.** It adds three nullable columns with no default and leaves existing rows untouched:
+  - `audit_log.answer`
+  - `audit_log.chunks`: JSON, one `{chunk_id, source, content_hash, distance}` per chunk that passed the filter, best first
+  - `audit_log.created_at`: `timestamptz`, written in UTC
+- **Downgrades refuse.** 0001's would drop every table; 0002's would delete recorded answers from an append-only log. Because the migrations only add, a rollback means redeploying the previous code, which ignores the new columns. It never needs a schema downgrade.
+- **Chunk ids come from content**: `{filename}::{index}::{first 12 hex of sha256(text)}`. They are built in one place, `pipeline.chunk_ids_and_metadata` (using `retrieve.make_chunk_id`), for startup indexing and `/upload` alike. Chroma metadata gains `chunk_index` and the full 64-character `content_hash`. The counter is gone.
+- **The audit row.**
+  - `top_distance` is `None` when nothing passed, and the early-return row records its real answer text.
+  - `sources` and the old `timestamp` are still written, so the code from before P0.2 keeps working on new rows if it is ever redeployed.
+  - `/audit` reports `created_at` in UTC; Postgres hands it back in the session's time zone, IST locally.
+  - `/audit` sorts by id instead of by the mixed-zone timestamps, and returns `null` for the fields old rows don't have.
+  - `log_query_db` takes its fields by keyword only (`*` in the signature), so `answer` and `reason`, both strings, can't be swapped by position.
+- **`print_schema.py`**: a read-only schema print. Its first statement is `SET TRANSACTION READ ONLY`, the host goes to stderr, and types are spelled the way PostgreSQL spells them. Its output for revision 0001 is committed as `migrations/baseline_schema.txt`, so Neon can be compared with it before Neon is stamped at Ship 1.
+- **Frontend.** The Audit page shows "—" for a missing distance and a collapsed "Answer and sources": the answer, and each chunk id with its distance. It also works against the old backend.
+
+**Alternatives considered.**
+- **Converting `audit_log.timestamp` to `timestamptz`.** One column instead of two, but not additive, and it would rewrite every past audit row with a guessed zone: rows written from the Mac in IST would move 5.5 hours. A new column leaves history as it was recorded.
+- **Writing UTC into the old column.** No schema change, but the value would still carry no zone, and new UTC rows would look the same as old IST rows.
+- **Random ids (UUIDs)**, as the README once suggested. They can't collide, but they change on every restart, so an audit row still couldn't be matched to the index, and an id would say nothing about the text. A content hash does both.
+- **Storing each chunk's text in the audit row.** A complete record, but about 7 KB per question, and the text already lives in the documents. The hash proves which text was used.
+- **Reporting old rows' `0.0` as `null`.** The rule would be exact: only no-source rows have empty `sources`. But the log would then report something other than what was recorded. Old rows are left as written, and the README says so.
+- **A full eval run.** Ids are never sent to the model, so about 41 model calls could only have measured the model's own randomness. A retrieval-only comparison is exact and free. P0.4 changes the prompt, so its run misses the cache anyway.
+
+**Consequences and limitations.**
+- **Old audit rows stay as recorded.** They keep:
+  - positional ids that no longer resolve
+  - no answer and no chunk hashes
+  - timestamps in the local time of whichever machine wrote them: IST from the Mac, UTC from Render
+  - `0.0` on "no source" rows
+- **A hash identifies the text but doesn't keep it.** If a document's text changes, an old row shows that its text differed, not what it said. P0.3 stores the current text in Postgres; there is no text history.
+- **The eval's cache keys include chunk ids**, so the next full run makes fresh model calls. `corpus_sha256` changes too, although no chunk text did.
+- **`audit_log` now has two time columns.** `/audit` uses `created_at` when a row has one.
+- **Ship order at Ship 1:** the frontend must deploy before the backend. The old Audit page calls `toFixed` on the distance and fails on `null`.
+
+**How it was verified.**
+- **The baseline matches what exists.** A fresh database built by revision 0001 printed a schema byte-for-byte identical to the local and eval databases. Alembic's comparison found exactly three additions between 0001 and the models, and after 0002 `alembic check` found no differences.
+- **The real databases migrated cleanly.** The local and eval databases were stamped at 0001 and upgraded. `alembic check` is clean on both, and their 15 and 96 old rows are untouched.
+- **Downgrade refused.** On the scratch database it was refused and left the database at 0002.
+- **`--sql`** showed 0002's SQL: three `ADD COLUMN`s and the version bump, in one transaction.
+- **Shell wins.** A `DATABASE_URL` set in the shell overrode `.env`: Alembic logged the shell's database name.
+- **`print_schema.py` is read-only.** A write after its `SET TRANSACTION READ ONLY` was refused.
+- **No retrieval change.**
+  - For all 48 eval questions, the top 5 chunks matched the P0.5 results file exactly: source, distance, first line and order.
+  - Every id matched its chunk's text, and two separate processes produced the same 26 ids.
+  - `calibrate.py` printed the same result (1.02, 17 of 23, 73.9%).
+- **Smoke test against the eval database**, with a stub model:
+  - A breach question's row recorded the answer, five chunks with their hashes, best distance 0.700 and a UTC time.
+  - An off-topic question's row recorded `top_distance: null` and `chunks: []`.
+- **Tests.** 13 new unit tests, 39 in all: ids, the audit row and how it is read, and the pipeline's audit write against a fake index. Frontend lint and build pass.
