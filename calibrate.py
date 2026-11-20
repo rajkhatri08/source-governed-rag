@@ -1,6 +1,6 @@
 from eval_questions import QUESTIONS
 from ingest import load_document, clean_text, chunk_by_article, load_metadata
-from retrieve import build_index, make_chunk_id, search
+from retrieve import add_to_index, make_chunk_id, new_index, search
 
 metadata = load_metadata("documents/metadata.json")
 
@@ -17,7 +17,8 @@ for filename in metadata:
         all_chunks.append(chunk)
         all_meta.append(cm)
 
-collection = build_index(all_ids, all_chunks, all_meta)
+collection = new_index()
+add_to_index(collection, all_ids, all_chunks, all_meta)
 
 results = []
 for question, answerable, source in QUESTIONS:

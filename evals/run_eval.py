@@ -20,11 +20,11 @@ from evals.questions_v2 import QUESTIONS
 from evals.scoring import METRICS, cache_key, score_question, sha256_text, summarise
 from generate import MODEL, PROMPT_TEMPLATE, generate_answer
 from govern import RELEVANCE_CUTOFF
-from retrieve import search
+from retrieve import new_index, search
 
 EVAL_HOST = use_eval_database()  # before the two imports below: db.py reads DATABASE_URL on import
 
-from db import read_documents  # noqa: E402
+from db import read_documents_to_index  # noqa: E402
 from pipeline import TOP_K, ModelUnavailable, answer_question, index_documents  # noqa: E402
 
 EVAL_TODAY = date(2026, 11, 18)  # fixed, so results don't change by themselves when a review date passes
@@ -163,9 +163,10 @@ def main() -> None:
         raise SystemExit(f"{results_path} already exists: pick another label")
 
     print(f"eval database host: {EVAL_HOST}")
-    collection, skipped = index_documents(read_documents())
-    if skipped:
-        raise SystemExit(f"eval documents could not be read: {skipped}")
+    collection = new_index()
+    indexed, failed = index_documents(collection, read_documents_to_index())
+    if failed:
+        raise SystemExit(f"eval documents could not be indexed: {failed}")
 
     client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
     generator = CachedGenerator(collection)

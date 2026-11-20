@@ -39,7 +39,7 @@ FastAPI (Render)
     |
     +--> ChromaDB          in-memory vector store, all-MiniLM-L6-v2 via ONNX
     +--> Gemini 3.6 Flash  grounded generation
-    +--> PostgreSQL (Neon) document metadata + audit log
+    +--> PostgreSQL (Neon) document text and metadata + audit log
 ```
 
 ### Request flow
@@ -59,7 +59,8 @@ A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of 
 
 | File | Responsibility |
 |---|---|
-| `ingest.py` | Load text and PDF documents, clean, chunk |
+| `ingest.py` | Clean and chunk text |
+| `upload.py` | Every check on an upload, before anything is stored; text extraction from .txt and .pdf |
 | `retrieve.py` | Build the vector index, search, add to a live index; content-derived chunk ids |
 | `generate.py` | Prompt construction and the model call |
 | `govern.py` | Expiry check and tier classification |
@@ -71,6 +72,7 @@ A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of 
 | `migrations/`, `alembic.ini` | Alembic schema migrations; `migrations/baseline_schema.txt` is the schema revision 0001 creates |
 | `print_schema.py` | Read-only schema print, to compare a database with the baseline before stamping it |
 | `migrate.py` | One-off load of document metadata into Postgres |
+| `backfill_content.py` | Fills the stored text of documents created before it was kept, from the seed files in `documents/` |
 
 ---
 
@@ -119,13 +121,24 @@ The concrete case: the question *"how quickly must AI-related data requests be a
 
 ## Document upload
 
-Documents can be uploaded at runtime through the dashboard or the API, as plain text or PDF. An uploaded document is chunked, added to the live ChromaDB collection, and searchable immediately — no restart required to retrieve from it.
+Documents can be uploaded at runtime through the dashboard or the API, as plain text or PDF. An uploaded document's text is stored in Postgres, then chunked and added to the live ChromaDB collection, so it is searchable immediately and still there after a restart: at startup the index is rebuilt from the text in Postgres. Nothing is written to disk; `documents/` holds only the seed documents.
 
 **Uploaded documents default to unapproved.** This is the governance premise applied to ingestion: a new document is retrievable but cannot produce a GOLD answer until someone explicitly approves it. Answers drawn from it are returned with a named warning and a BRONZE tier.
 
 PDF text is extracted with `pypdf` and passed through a PDF-specific cleaning stage before the general one. That stage normalises ligatures (`ﬁ` → `fi`, `ﬂ` → `fl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
 
-The endpoint validates the review date and claims the filename in the database **before** writing anything to disk, so a rejected upload leaves no stray file and does no extraction work. The filename must be a plain name: one that is empty, starts with `.`, or contains `/` or `\` is rejected, so an upload cannot write outside `documents/`.
+**Every check runs before anything is stored** (`upload.py`), cheapest first. A failed upload therefore leaves nothing behind.
+- **The name** must be a plain file name:
+  - letters and digits in any language, spaces, and `. _ - ( ) & , ' +`, plus the typographic apostrophes and dashes `’ ‘ – —` that Word and macOS insert
+  - no `/` `\` `:` `#` `?` `%` or control characters
+  - not starting with a dot, at most 200 characters, ending in `.pdf` or `.txt` (any case)
+
+  It is normalised to NFC, so an accented letter is stored one way, however the browser sent it.
+- **The owner, version and review date** must fit their columns, and the date must be a real `YYYY-MM-DD`.
+- **The file** must be at most 10 MB.
+- **There must be text to extract.** A PDF with no text layer, a PDF that can't be read, or a .txt that isn't UTF-8 is refused with a message saying which.
+
+Only then is the row inserted, with its text, in one transaction. A duplicate name is refused by Postgres's unique constraint itself, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved.
 
 ---
 
@@ -188,11 +201,12 @@ GOOGLE_API_KEY=your_gemini_key
 DATABASE_URL=postgresql://user:password@localhost:5432/compliance
 ```
 
-Create the tables with the migrations, then load document metadata:
+Create the tables with the migrations, load document metadata, then store each seed document's text:
 
 ```bash
 alembic upgrade head
 python migrate.py
+python backfill_content.py
 ```
 
 Every schema change is an Alembic migration in `migrations/versions/`. `alembic upgrade head` applies the ones a database hasn't had yet; `alembic upgrade 0001:head --sql` prints their SQL without connecting. A `DATABASE_URL` set in the shell takes precedence over `.env`. The migrations only add columns or tables, so the code already deployed keeps working while a database is migrated ahead of a deploy.
@@ -213,16 +227,23 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness check; also lists documents skipped at startup because their file was missing or unreadable (`skipped_documents`) |
+| GET | `/health` | Always HTTP 200: `status` (`ok` or `degraded`), whether the database answers, documents and chunks indexed, and the documents that failed to index at startup, each with a reason |
 | POST | `/query` | Ask a question; returns answer, tier, reason, warnings, sources |
 | GET | `/documents` | Document inventory with computed expiry status |
-| POST | `/upload` | Upload a `.txt` or `.pdf`; indexed immediately, unapproved by default |
+| POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB); stored in Postgres, indexed immediately, unapproved by default |
 | POST | `/documents/{filename}/approve` | Approve a document |
 | POST | `/documents/{filename}/unapprove` | Revoke approval |
 | POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
 | GET | `/audit` | Full audit log, newest first: each row's answer and the exact chunks it used |
 
-Errors: `400` on an empty question, a malformed review date or a filename that isn't a plain name, `404` on an unknown document, `409` on a duplicate filename, `503` when the model is unavailable.
+Errors, each with a plain message in `detail`:
+- `400` on an empty question, or an upload's name, owner, version or review date
+- `404` on an unknown document
+- `409` on a duplicate filename
+- `413` on an upload over 10 MB
+- `422` on an upload with no extractable text, an unreadable PDF or a .txt that isn't UTF-8
+- `500` if indexing an upload fails (nothing is saved)
+- `503` when the model is unavailable
 
 ---
 
@@ -234,9 +255,11 @@ These are real and worth stating plainly.
 
 **Retirement is one-way.** There is no reinstate endpoint. A retired document can only be brought back by editing the database directly.
 
-**The document row is created before the file is written.** If the write failed, the database would hold a row pointing at a missing file. Doing this properly needs a transaction spanning Postgres and the filesystem, which is awkward when only one of them supports transactions.
+**Only the extracted text is kept, not the uploaded file.** The original PDF is never stored. An improvement to PDF cleaning can't be applied to documents uploaded before it, because their raw text is gone. The seed documents can be re-extracted from `documents/`.
 
-**Uploads don't survive a restart on the hosted demo.** Render's free instance has an ephemeral disk, so an uploaded file is lost when the service restarts or spins down, while its row stays in Postgres. Startup skips any document whose file is missing or unreadable, logs a warning and lists it under `skipped_documents` in `/health`. The service stays up, but the skipped document is no longer searchable. The fix is to store each document's extracted text in Postgres rather than on disk.
+**The index is rebuilt from scratch on every start.** The vector index lives in memory, so each cold start re-embeds every stored document's chunks. That is fine for a few dozen chunks, slow for tens of thousands. A persistent vector store (for example pgvector) is the scale fix.
+
+**The 10 MB limit is checked after the upload has arrived.** The web framework receives the whole request, buffering anything over 1 MB in a temporary file, before the endpoint can measure it. An oversized upload is refused with a clear message, but only once it has been sent in full.
 
 **PDF cleaning is heuristic.** The line-joining regex uses punctuation and capitalisation to guess where a sentence continues across a line break. It works on the documents tested, but it is a guess, not a rule, and it will misjudge some layouts.
 
@@ -244,7 +267,7 @@ These are real and worth stating plainly.
 
 **The evaluation set is 48 questions**, all written and labelled by one person. An answer's facts are checked by substring, which can pass a wrong answer that contains the phrase ("not 72 hours") and miss a correct one worded differently. Large enough to compare configurations against each other on the same questions; too small to claim an absolute accuracy figure with confidence.
 
-**Few unit tests.** Only the evaluation's scoring and the chunker are unit-tested so far. Nothing yet checks that `is_expired` handles a malformed date, or how the API answers a bad request.
+**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check, and the `/upload` and `/health` endpoints. Nothing yet checks the tier rules in `govern.py`, such as how `is_expired` handles a malformed date, or the other endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
 
 **Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 

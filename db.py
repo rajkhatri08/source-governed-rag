@@ -1,15 +1,20 @@
 import os
 import json
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost:5432/compliance")
+UNIQUE_VIOLATION = "23505"  # the SQLSTATE code Postgres gives a duplicate key, whatever the constraint is called
 
-engine = create_engine(DATABASE_URL)
+# pool_pre_ping tests each pooled connection before handing it out: Neon's free compute closes every
+# connection when it sleeps, and without the check the first query after a pause would fail.
+# connect_timeout bounds how long a connection attempt can hang, in seconds.
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args={"connect_timeout": 10})
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -40,6 +45,13 @@ class Document(Base):
     approved = Column(Boolean, default=False)
     retired = Column(Boolean, default=False)
     review_date = Column(String(20))
+    content = Column(Text)  # from P0.3: the extracted, cleaned text that is chunked and indexed
+    content_sha256 = Column(String(64))  # from P0.3
+    created_at = Column(DateTime(timezone=True))  # from P0.3: when the upload was stored, UTC; null for older rows
+
+
+class DuplicateDocument(Exception):
+    """Postgres refused the insert: a document with this filename already exists."""
 
 
 def new_audit_entry(question: str, *, answer: str, tier: str, reason: str,
@@ -138,21 +150,69 @@ def set_retired(filename, retired):
     return doc is not None
 
 
-def add_document(filename, owner, version, review_date):
+def is_unique_violation(error: IntegrityError, table: str) -> bool:
+    """True if Postgres refused a duplicate key (SQLSTATE 23505) in `table`.
+
+    Decided by the error code and table Postgres reports, not by a constraint's name, which
+    can differ between databases.
+    """
+    original = error.orig
+    return (getattr(original, "pgcode", None) == UNIQUE_VIOLATION
+            and getattr(getattr(original, "diag", None), "table_name", None) == table)
+
+
+def insert_document(*, filename: str, owner: str, version: str, review_date: str,
+                    content: str, content_sha256: str) -> int:
+    """Store a new, unapproved document and its text in one transaction; returns the row's id.
+
+    There is no check-then-insert: Postgres's unique constraint decides, so two simultaneous
+    uploads of one name can't both succeed. A duplicate raises DuplicateDocument.
+    """
     session = Session()
-    existing = session.query(Document).filter(Document.filename == filename).first()
-    if existing:
+    try:
+        doc = Document(filename=filename, owner=owner, version=version, approved=False, retired=False,
+                       review_date=review_date, content=content, content_sha256=content_sha256,
+                       created_at=datetime.now(timezone.utc))
+        session.add(doc)
+        session.flush()  # sends the INSERT, so a duplicate fails here and the new id is known
+        document_id = doc.id
+        session.commit()
+        return document_id
+    except IntegrityError as e:
+        session.rollback()
+        if is_unique_violation(e, "documents"):
+            raise DuplicateDocument(filename) from e
+        raise
+    finally:
         session.close()
+
+
+def delete_document(document_id: int) -> None:
+    """Undo insert_document when indexing the upload failed: a failed upload leaves no row behind."""
+    session = Session()
+    try:
+        session.query(Document).filter(Document.id == document_id).delete()
+        session.commit()
+    finally:
+        session.close()
+
+
+def read_documents_to_index() -> list[dict]:
+    """Every document that isn't retired, with its stored text, in the order they were added."""
+    session = Session()
+    try:
+        rows = session.query(Document).filter(Document.retired.isnot(True)).order_by(Document.id).all()
+        return [{"filename": r.filename, "owner": r.owner, "version": r.version, "approved": r.approved,
+                 "review_date": r.review_date, "content": r.content} for r in rows]
+    finally:
+        session.close()
+
+
+def database_reachable() -> bool:
+    """True if a trivial query succeeds right now. /health reports it."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return True
+    except OperationalError:
         return False
-    doc = Document(
-        filename=filename,
-        owner=owner,
-        version=version,
-        approved=False,
-        retired=False,
-        review_date=review_date
-    )
-    session.add(doc)
-    session.commit()
-    session.close()
-    return True

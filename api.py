@@ -1,23 +1,55 @@
+import logging
 import os
-from datetime import date
+import time
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 from google import genai
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.exc import OperationalError
 
-from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_document
-from retrieve import add_to_index
 from govern import is_expired
-from db import read_log_db, read_documents, set_approved, set_retired, add_document
-from pipeline import ModelUnavailable, answer_question, chunk_ids_and_metadata, index_documents
+from db import (DuplicateDocument, database_reachable, delete_document, insert_document, read_documents,
+                read_documents_to_index, read_log_db, set_approved, set_retired)
+from pipeline import ModelUnavailable, answer_question, index_document, index_documents
+from retrieve import new_index
+from upload import MAX_UPLOAD_BYTES, UploadRejected, prepare_upload
 
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+logger = logging.getLogger(__name__)
 
-collection, skipped_documents = index_documents(read_documents())
+STARTUP_RETRY_WAITS = [1, 2, 4, 8]  # seconds between attempts: Neon's free compute takes a moment to wake
 
-app = FastAPI()
+
+def read_documents_with_retry() -> list[dict]:
+    """The documents to index at startup, retrying while the database wakes up.
+
+    If the last attempt fails too, its error stops startup: the service doesn't run without its
+    source of truth (fail fast), and Render restarts it.
+    """
+    for attempt, wait in enumerate(STARTUP_RETRY_WAITS, start=1):
+        try:
+            return read_documents_to_index()
+        except OperationalError:
+            logger.warning(f"database unreachable at startup (attempt {attempt}); retrying in {wait} s")
+            time.sleep(wait)
+    return read_documents_to_index()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Runs once, before the first request is served: index the text stored in Postgres."""
+    app.state.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    app.state.collection = new_index()
+    indexed, failed = index_documents(app.state.collection, read_documents_with_retry())
+    app.state.indexed_documents = set(indexed)
+    app.state.failed_documents = failed
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,17 +67,26 @@ class Query(BaseModel):
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "skipped_documents": skipped_documents}
+def health(request: Request):
+    """Always HTTP 200, so a database blip doesn't get the service restarted; "degraded" says what's wrong."""
+    database = database_reachable()
+    failed = request.app.state.failed_documents
+    return {
+        "status": "ok" if database and not failed else "degraded",
+        "database": database,
+        "documents_indexed": len(request.app.state.indexed_documents),
+        "chunks_indexed": request.app.state.collection.count(),
+        "failed_documents": failed,
+    }
 
 
 @app.post("/query")
-def query(q: Query):
+def query(q: Query, request: Request):
     if not q.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
 
     try:
-        return answer_question(q.question, collection, client)
+        return answer_question(q.question, request.app.state.collection, request.app.state.client)
     except ModelUnavailable:
         raise HTTPException(status_code=503, detail="model unavailable, please retry")
 
@@ -59,44 +100,44 @@ def documents():
 
 
 @app.post("/upload")
-async def upload(
+def upload(
+    request: Request,
     file: UploadFile = File(...),
     owner: str = Form(...),
     version: str = Form(...),
     review_date: str = Form(...)
 ):
+    """Check everything first, then one insert, then index. A failed upload leaves nothing behind.
+
+    A plain `def`, not `async def`: FastAPI runs it in a worker thread, so parsing and embedding a
+    large PDF don't hold up other requests. Nothing is written to disk.
+    """
+    data = file.file.read(MAX_UPLOAD_BYTES + 1)  # one byte over the limit is enough to know it's too big
     try:
-        date.fromisoformat(review_date)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="review_date must be YYYY-MM-DD")
+        prepared = prepare_upload(file.filename, data, owner=owner, version=version, review_date=review_date)
+    except UploadRejected as e:
+        raise HTTPException(status_code=e.status, detail=e.message)
 
-    filename = file.filename
-    if not filename or filename.startswith(".") or "/" in filename or "\\" in filename:
-        raise HTTPException(status_code=400, detail="filename must be a plain file name")
+    try:
+        document_id = insert_document(filename=prepared.filename, owner=prepared.owner, version=prepared.version,
+                                      review_date=prepared.review_date, content=prepared.content,
+                                      content_sha256=prepared.content_sha256)
+    except DuplicateDocument:
+        raise HTTPException(status_code=409, detail=f"a document named {prepared.filename} already exists")
 
-    added = add_document(filename, owner, version, review_date)
-    if not added:
-        raise HTTPException(status_code=409, detail="document already exists")
+    doc = {"filename": prepared.filename, "owner": prepared.owner, "version": prepared.version,
+           "approved": False, "review_date": prepared.review_date}
+    try:
+        index_document(request.app.state.collection, doc, prepared.chunks)
+    except Exception:
+        # Whatever failed, the upload must not half-exist: remove the row, then report the failure.
+        logger.exception(f"indexing the upload {prepared.filename} failed; removing its row")
+        delete_document(document_id)
+        raise HTTPException(status_code=500,
+                            detail="indexing the document failed, so nothing was saved; please try again")
+    request.app.state.indexed_documents.add(prepared.filename)
 
-    path = "documents/" + filename
-    contents = await file.read()
-    with open(path, "wb") as f:
-        f.write(contents)
-
-    if filename.endswith(".pdf"):
-        text = clean_pdf_text(load_pdf(path))
-    else:
-        text = load_document(path)
-
-    cleaned = clean_text(text)
-    doc_chunks = chunk_document(cleaned)
-
-    doc = {"filename": filename, "owner": owner, "version": version,
-           "approved": False, "review_date": review_date}
-    ids, metas = chunk_ids_and_metadata(doc, doc_chunks)
-    add_to_index(collection, ids, doc_chunks, metas)
-
-    return {"filename": filename, "chunks": len(doc_chunks), "approved": False}
+    return {"filename": prepared.filename, "chunks": len(prepared.chunks), "approved": False}
 
 
 @app.post("/documents/{filename}/approve")

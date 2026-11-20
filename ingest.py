@@ -1,6 +1,5 @@
 import re
 import json
-from pypdf import PdfReader
 
 # Each pattern matches the position just before a heading line, so every piece keeps its heading.
 ARTICLE_HEADING = re.compile(r"^(?=Art\. \d+ GDPR$)", re.MULTILINE)  # a line that is exactly "Art. 12 GDPR"
@@ -119,11 +118,3 @@ def load_document(path):
 def load_metadata(path):
     with open(path, "r") as f:
         return json.load(f)
-
-
-def load_pdf(path):
-    reader = PdfReader(path)
-    pages = []
-    for page in reader.pages:
-        pages.append(page.extract_text())
-    return "\n".join(pages)

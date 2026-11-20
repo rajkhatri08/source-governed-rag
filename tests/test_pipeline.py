@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 import pipeline
-from retrieve import content_hash
+from retrieve import content_hash, make_chunk_id
 
 TODAY = date(2026, 11, 18)
 GDPR = {"filename": "gdpr_ch3.txt", "owner": "Legal & Compliance", "version": "2016/679",
@@ -55,3 +55,41 @@ def test_the_audit_row_names_exactly_the_chunks_that_passed_the_filter(logged):
     assert logged[0]["answer"] == "Within 72 hours."
     assert logged[0]["chunks"] == [{"chunk_id": IDS[0], "source": "gdpr_ch3.txt",
                                     "content_hash": content_hash(TEXTS[0]), "distance": 0.785}]
+
+
+class RecordingIndex:
+    """Stands in for the Chroma collection at startup: records what each document adds, and can fail one."""
+
+    def __init__(self, fail_for: str | None = None):
+        self.added = {}
+        self.fail_for = fail_for
+
+    def add(self, ids: list[str], documents: list[str], metadatas: list[dict]) -> None:
+        source = metadatas[0]["source"]
+        if source == self.fail_for:
+            raise RuntimeError("embedding failed")
+        self.added[source] = ids
+
+
+def stored(filename: str, content: str | None) -> dict:
+    """A document as read_documents_to_index returns it."""
+    return {**GDPR, "filename": filename, "content": content}
+
+
+def test_startup_with_no_documents_indexes_nothing_and_fails_nothing():
+    assert pipeline.index_documents(RecordingIndex(), []) == ([], [])
+
+
+def test_a_document_without_stored_text_is_reported_and_the_others_are_still_indexed():
+    index = RecordingIndex()
+    indexed, failed = pipeline.index_documents(index, [stored("lost.txt", None), stored("gdpr_ch3.txt", TEXTS[0])])
+    assert indexed == ["gdpr_ch3.txt"]
+    assert failed == [{"filename": "lost.txt", "reason": "no stored content"}]
+    assert index.added == {"gdpr_ch3.txt": [make_chunk_id("gdpr_ch3.txt", 0, TEXTS[0])]}
+
+
+def test_a_document_that_fails_to_index_is_reported_and_startup_goes_on():
+    index = RecordingIndex(fail_for="bad.txt")
+    indexed, failed = pipeline.index_documents(index, [stored("bad.txt", TEXTS[1]), stored("gdpr_ch3.txt", TEXTS[0])])
+    assert indexed == ["gdpr_ch3.txt"]
+    assert failed == [{"filename": "bad.txt", "reason": "indexing failed"}]

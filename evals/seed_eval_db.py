@@ -1,14 +1,22 @@
-"""Set the eval database to its fixed governance state: the three documents in metadata.json.
+"""Set the eval database to its fixed state: the three documents in metadata.json, with their text.
 
 Run from the repo root: python -m evals.seed_eval_db
-Safe to run again: it inserts or updates those three rows and never deletes anything.
+Safe to run again: it inserts or updates those three rows and never deletes anything. Each row's
+content is extracted from its file in documents/ exactly as an upload's would be, so the eval
+indexes the same text as the app.
 The tables come from the migrations, not from this script: run `alembic -x db=eval upgrade head` first.
 """
+from pathlib import Path
+
 from evals.eval_db import use_eval_database
 
 EVAL_HOST = use_eval_database()  # first: db.py reads DATABASE_URL when it is imported
 
 import db  # noqa: E402
+from retrieve import content_hash  # noqa: E402
+from upload import extract_text  # noqa: E402
+
+DOCUMENTS = Path("documents")
 
 FIXED_DOCUMENTS = [
     {"filename": "gdpr_ch3.txt", "owner": "Legal & Compliance", "version": "2016/679",
@@ -40,12 +48,15 @@ def main() -> None:
             row.approved = fixed["approved"]
             row.retired = False
             row.review_date = fixed["review_date"]
+            row.content = extract_text(fixed["filename"], (DOCUMENTS / fixed["filename"]).read_bytes())
+            row.content_sha256 = content_hash(row.content)
         session.commit()
     finally:
         session.close()
 
-    for d in db.read_documents():
-        print(f"  {d['filename']}: approved={d['approved']} retired={d['retired']} review={d['review_date']}")
+    for d in db.read_documents_to_index():  # read back from the database, so this checks what was stored
+        print(f"  {d['filename']}: approved={d['approved']} review={d['review_date']} "
+              f"content={len(d['content'])} characters, sha256 {content_hash(d['content'])[:12]}")
 
 
 if __name__ == "__main__":

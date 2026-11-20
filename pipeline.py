@@ -5,13 +5,12 @@ from datetime import date
 
 from chromadb import Collection
 from google import genai
-from pypdf.errors import PyPdfError
 
 from db import log_query_db
 from generate import generate_answer
 from govern import RELEVANCE_CUTOFF, classify, is_expired
-from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_document
-from retrieve import build_index, content_hash, make_chunk_id, search
+from ingest import chunk_document
+from retrieve import add_to_index, content_hash, make_chunk_id, search
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class ModelUnavailable(Exception):
 
 
 def chunk_ids_and_metadata(doc: dict, chunks: list[str]) -> tuple[list[str], list[dict]]:
-    """The index ids and metadata for one document's chunks, used by startup indexing and /upload."""
+    """The index ids and metadata for one document's chunks."""
     ids = []
     metadatas = []
     for index, chunk in enumerate(chunks):
@@ -40,36 +39,35 @@ def chunk_ids_and_metadata(doc: dict, chunks: list[str]) -> tuple[list[str], lis
     return ids, metadatas
 
 
-def index_documents(docs: list[dict]) -> tuple[Collection, list[str]]:
-    """Chunk and index every active document, skipping any whose file is missing or unreadable.
+def index_document(collection: Collection, doc: dict, chunks: list[str]) -> None:
+    """Add one document's chunks to the index. Startup and /upload both use it."""
+    ids, metadatas = chunk_ids_and_metadata(doc, chunks)
+    add_to_index(collection, ids, chunks, metadatas)
 
-    Returns the collection and the filenames that were skipped.
+
+def index_documents(collection: Collection, docs: list[dict]) -> tuple[list[str], list[dict]]:
+    """Index each document's stored text, one document at a time, so one failure can't stop the rest.
+
+    Returns the filenames indexed and the failures as {filename, reason}. A reason is a short fixed
+    phrase, safe for /health to show; the details go to the log.
     """
-    all_ids = []
-    all_chunks = []
-    all_meta = []
-    skipped = []
-
+    indexed = []
+    failed = []
     for d in docs:
-        if d["retired"]:
+        if not d["content"]:
+            logger.warning(f"not indexing {d['filename']}: no stored content (run backfill_content.py)")
+            failed.append({"filename": d["filename"], "reason": "no stored content"})
             continue
         try:
-            if d["filename"].endswith(".pdf"):
-                text = clean_pdf_text(load_pdf("documents/" + d["filename"]))
-            else:
-                text = load_document("documents/" + d["filename"])
-            cleaned = clean_text(text)
-            doc_chunks = chunk_document(cleaned)
-        except (OSError, UnicodeDecodeError, PyPdfError) as e:
-            logger.warning(f"skipping {d['filename']} at startup: {type(e).__name__}: {e}")
-            skipped.append(d["filename"])
+            index_document(collection, d, chunk_document(d["content"]))
+        except Exception:
+            # The index and its embedding model can fail in many ways; one bad document must not
+            # stop startup. The traceback goes to the log, and /health lists the document.
+            logger.exception(f"indexing {d['filename']} failed at startup")
+            failed.append({"filename": d["filename"], "reason": "indexing failed"})
             continue
-        ids, metas = chunk_ids_and_metadata(d, doc_chunks)
-        all_ids.extend(ids)
-        all_chunks.extend(doc_chunks)
-        all_meta.extend(metas)
-
-    return build_index(all_ids, all_chunks, all_meta), skipped
+        indexed.append(d["filename"])
+    return indexed, failed
 
 
 def answer_question(question: str, collection: Collection, client: genai.Client,

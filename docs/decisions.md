@@ -371,3 +371,76 @@ Commit: the one that adds this entry.
   - A breach question's row recorded the answer, five chunks with their hashes, best distance 0.700 and a UTC time.
   - An off-topic question's row recorded `top_distance: null` and `chunks: []`.
 - **Tests.** 13 new unit tests, 39 in all: ids, the audit row and how it is read, and the pipeline's audit write against a fake index. Frontend lint and build pass.
+
+---
+
+## 20 Nov 2026 · P0.3: durable, safe uploads; a startup that reads Postgres
+
+Commit: the one that adds this entry.
+
+**Context.**
+- **Uploads didn't survive a restart.** They were written to `documents/` on Render's ephemeral disk and lost on the next restart, while their row stayed; H0 only made startup skip them.
+- **`/upload` did things in the wrong order.** It inserted the row first (check-then-insert, so two simultaneous uploads could race), then wrote the file, then extracted the text. A broken PDF left a row behind with a 500.
+- **No limits.** Nothing limited size or type, and `file.filename` was used as a path.
+- **Startup ran on import.** It ran when `api.py` was imported, and read files from disk.
+- **A dead-connection failure.** SQLAlchemy's pool kept connections that Neon closes when its free compute sleeps, so the first query after a pause could fail.
+
+**Decision.**
+- **Migration 0003, additive**, adds three columns to `documents`:
+  - `content`: the extracted, cleaned text
+  - `content_sha256`
+  - `created_at`: UTC; null for older rows, because when they were created isn't known
+- **An upload is prepare → insert → index.**
+  - **Prepare.** `upload.prepare_upload` runs every check before anything is stored, cheapest first. Each failure is an `UploadRejected(status, message)`.
+    - **The name** is NFC-normalised. Allowed: letters, digits and combining marks in any script, plus space, `. _ - ( ) & , ' +`, and the typographic `’ ‘ – —` that Word and macOS insert. Not allowed: `/ \ : # ? %` and control characters. A `:` would make chunk ids ambiguous; `#`, `?` and `%` break the document URLs. No leading dot, at most 200 characters, `.pdf` or `.txt` in any case.
+    - **Then** the owner, version and review date; the size (10 MB, 413); the text, extracted in memory (422 for no text, an unreadable PDF or a .txt that isn't UTF-8); and the chunks.
+  - **Insert.** `db.insert_document` stores the row with its text in one transaction. A duplicate is detected from Postgres's unique-violation code (SQLSTATE 23505) on `documents` → 409. It isn't checked before the insert, and it isn't identified by the constraint's name, which hasn't been verified on Neon.
+  - **Index.** If indexing fails, `db.delete_document` removes the row, and the upload reports 500 "nothing was saved".
+  - **The route is a plain `def`.** It runs in a worker thread, so parsing and embedding a large file don't block other requests. Nothing is written to disk.
+- **Startup is a lifespan handler.**
+  - It reads the non-retired rows with their text, retrying an `OperationalError` after 1, 2, 4 and 8 s, and fails fast if the database is still unreachable.
+  - It indexes each document separately and keeps the results on `app.state`.
+  - Importing `api.py` touches neither the database nor Gemini, so the tests can import it.
+- **`/health` always returns 200**: `ok` or `degraded`, a live `SELECT 1`, the counts, and each document that failed with a fixed reason.
+- **The engine** gets `pool_pre_ping=True` and `connect_timeout=10`.
+- **`backfill_content.py`** fills `content` from `documents/` with the same `extract_text` as uploads.
+  - It is idempotent, runs in one transaction, and has `--dry-run` and `--retire-unfillable`.
+  - It reads only files that resolve inside `documents/`. Rows from before H0's name check could have a name like `../.env`, and reading that would store a secret as a document.
+- **The eval database's fixed state includes the text.** `seed_eval_db.py` sets it the same way.
+
+**Alternatives considered.**
+- **`os.path.basename` on the name**, as first planned. It would silently turn `../x.txt` into `x.txt`. Rejecting `/` and `\` says what's wrong, and the allowlist makes basename redundant.
+- **The plan's ASCII allowlist `[A-Za-z0-9._ -]`.** Safe, but it refuses names real people use: accents, "report (1).pdf", "Q&A". It was widened by decision, to the characters that are safe in a URL path, a chunk id and the database.
+- **Detecting a duplicate by the constraint name `documents_filename_key`.** Exact, but it assumes Neon names the constraint the same way. The error code and the table don't depend on a name.
+- **Starting with an empty index if the database is down.** It would look healthy and answer "no relevant source" to everything. Failing fast is fail-closed, and Render restarts the service.
+- **Keeping the row when indexing fails**, to be indexed at the next restart. The document would become searchable later without the user knowing. An upload either fully happens or leaves nothing, and the user can retry.
+- **Storing the original file (bytea).** It would allow re-extraction with better cleaning, but at up to 10 MB per upload on a 0.5 GB free database. The text is what the system needs.
+- **Running the backfill on the eval database.** The seed script owns the eval database's fixed state, so a fresh eval database takes two commands.
+
+**Consequences and limitations.**
+- **Only the extracted text is kept.** Later improvements to PDF cleaning, such as P0.3b's page-furniture removal or P0.6's ligature fix, can't be applied to earlier uploads.
+- **Every cold start re-embeds every stored chunk**, so large uploads make startup slower. P0.3b measures it.
+- **The 10 MB limit is checked after the request body has arrived.** Starlette buffers the body (to a temporary file past 1 MB), so the limit bounds memory, not transfer.
+- **A crash during indexing leaves a committed row**, which the next start retries. A document that exhausts memory would do so again; P0.3b's limits are the guard.
+- **A failed cleanup leaves a row behind.** If indexing fails and the compensating delete fails too, the row stays and is indexed at the next start, although the user was told nothing was saved. This is logged.
+- **The name rule still refuses some characters people use,** such as `;`, `!`, `@`, `[`, `]` and emoji. The message lists the offending characters and what is allowed.
+- **Ship 1 order.** Neon must be migrated and backfilled before the new backend starts. A backend that starts against a database without content indexes nothing.
+
+**How it was verified.**
+- **64 new unit tests, 103 in all**, none touching a database or the model:
+  - every name, field, size and text rule
+  - the API returning each rejection's status without calling the database or the index
+  - a duplicate giving 409
+  - an indexing failure removing the row and returning 500
+  - `/health` when ok and when degraded
+  - startup with no documents, with a document without text, and with one that fails to index
+  - duplicate detection by code and table
+- **End to end against a scratch database**, upgraded to 0003 and dropped afterwards, through the real startup:
+  - two uploads stored and indexed: a name with parentheses, and a PDF with an umlaut in its name
+  - the same name again: 409, from the real unique violation
+  - `../x.txt` 400, an 11 MB file 413, an image-only PDF 422
+  - a forced indexing failure: 500, with no row left
+  - after a second startup built from Postgres alone, the uploaded text was still the best match for a question about it
+  - `/documents` sends no content
+- **Local databases.** The dev and eval databases are at 0003, with `alembic check` clean. The backfill filled 3 rows on the dev database and reported `h0_missing_file_test.txt` (retired, no file); a second run changed nothing.
+- **Retrieval unchanged.** With the text read from Postgres, all 48 eval questions' top 5 match the P0.5 results, and the 26 chunk ids are byte-identical to P0.2's. `calibrate.py` printed the same result. No model calls.
