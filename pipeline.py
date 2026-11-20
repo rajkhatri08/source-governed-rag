@@ -10,7 +10,7 @@ from pypdf.errors import PyPdfError
 from db import log_query_db
 from generate import generate_answer
 from govern import RELEVANCE_CUTOFF, classify, is_expired
-from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_by_article
+from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_document
 from retrieve import build_index, search
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def index_documents(docs: list[dict]) -> tuple[Collection, list[str]]:
             else:
                 text = load_document("documents/" + d["filename"])
             cleaned = clean_text(text)
-            doc_chunks = chunk_by_article(cleaned)
+            doc_chunks = chunk_document(cleaned)
         except (OSError, UnicodeDecodeError, PyPdfError) as e:
             logger.warning(f"skipping {d['filename']} at startup: {type(e).__name__}: {e}")
             skipped.append(d["filename"])

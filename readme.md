@@ -23,7 +23,7 @@ The system indexes three documents: GDPR Chapter 3, an internal data retention p
 | Data Retention Policy v1.0 | 30 days | Approved, **expired 2023** |
 | Draft AI Usage Policy v0.3 | 24 hours | **Never approved** |
 
-Asked "how long do we have to report a data breach", vector search ranks the **expired policy first** — distance 0.743, against 0.894 for the current GDPR article. An ungoverned system would present its 30-day figure as the closest match, which would put an organisation in breach of the regulation it was trying to comply with.
+Asked "how long do we have to report a data breach", vector search ranks the **expired policy first** — distance 0.673 for its breach-notification section, against 0.837 for the paragraph of the current GDPR article that sets the 72-hour deadline. These distances come from the structure-aware chunker, which splits each document into its sections and paragraphs (see [Chunking](#chunking-measured-not-assumed)). An ungoverned system would present its 30-day figure as the closest match, which would put an organisation in breach of the regulation it was trying to comply with.
 
 The governance layer catches this. The answer is returned, the conflict is surfaced, the expired source is named, and the response is downgraded to SILVER.
 
@@ -89,6 +89,8 @@ re.split(r"(?=Art\. \d+ GDPR)", document)
 ```
 
 The lookahead matches the position before each heading without consuming it, so every chunk retains its own title.
+
+**Since P0.5, chunks follow each document's own structure** (`ingest.chunk_document`). An article longer than 1,500 characters — every article in the corpus — is split at its numbered paragraphs, and every piece is prefixed with the article's heading and title, so it still says where it comes from: `Art. 12 GDPR | Transparent information, … | 3. 1The controller shall provide …`. An internal policy is split at its `Section N.` headings, each piece prefixed with the policy's title and version. A document with neither is packed line by line into chunks of up to 1,000 characters. A long chunk's embedding averages many topics: whole, Art. 12 passed the 1.2 filter for none of the 17 evaluation questions that need it; split, it passes for 10. On evaluation v2 the change moved correct refusals from 36 to 41 of 48, answers with the expected facts from 17 to 26 of 34, and correct tiers from 28 to 31 of 48, with five questions getting worse — each explained in [docs/eval/p0.5.md](docs/eval/p0.5.md). The table above comes from the earlier harness and the article chunker; P3.2 re-runs that comparison on evaluation v2.
 
 ---
 
@@ -236,9 +238,9 @@ These are real and worth stating plainly.
 
 **The evaluation set is 48 questions**, all written and labelled by one person. An answer's facts are checked by substring, which can pass a wrong answer that contains the phrase ("not 72 hours") and miss a correct one worded differently. Large enough to compare configurations against each other on the same questions; too small to claim an absolute accuracy figure with confidence.
 
-**Few unit tests.** Only the evaluation's scoring is unit-tested so far. Nothing yet checks that `chunk_by_article` handles a document with no headings, or that `is_expired` handles a malformed date.
+**Few unit tests.** Only the evaluation's scoring and the chunker are unit-tested so far. Nothing yet checks that `is_expired` handles a malformed date, or how the API answers a bad request.
 
-**The chunker is GDPR-specific.** It matches `Art. N GDPR` headings. A document without them becomes a single chunk. A general system needs structure detection per document type with a character-based fallback.
+**Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 
 **Chunk ids are assigned from a counter held in process memory.** It survives as long as the process does, but a restart rebuilds the index from scratch, and concurrent uploads could collide. UUIDs would remove the coordination entirely.
 

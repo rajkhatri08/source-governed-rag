@@ -24,7 +24,7 @@ Tier rules (`govern.py`), in order: model refused → BRONZE · any relevant sou
 
 Other endpoints: `GET /health`, `GET /documents`, `POST /upload` (multipart; new documents unapproved), `POST /documents/{filename}/approve|unapprove|retire`, `GET /audit`.
 
-Startup (when `api.py` is imported) calls `pipeline.index_documents`: each active document's file in `documents/` is loaded, cleaned and chunked into the index. A document whose file is missing or unreadable (`OSError`, `UnicodeDecodeError`, pypdf's `PyPdfError`) is skipped with a logged warning; `GET /health` returns `{"status": "ok", "skipped_documents": [...]}`. `POST /upload` rejects a filename that is empty, starts with `.`, or contains `/` or `\` with 400, before any write.
+Startup (when `api.py` is imported) calls `pipeline.index_documents`: each active document's file in `documents/` is loaded, cleaned and chunked into the index by `ingest.chunk_document`, which follows the document's structure: a GDPR article over 1,500 characters becomes one chunk per numbered paragraph, a policy one chunk per `Section N.`, each piece prefixed with its heading and title (`Art. 12 GDPR | <title> | 3. …`); a document with neither is packed line by line into chunks of up to 1,000 characters. A document whose file is missing or unreadable (`OSError`, `UnicodeDecodeError`, pypdf's `PyPdfError`) is skipped with a logged warning; `GET /health` returns `{"status": "ok", "skipped_documents": [...]}`. `POST /upload` rejects a filename that is empty, starts with `.`, or contains `/` or `\` with 400, before any write.
 
 ## Files (backend)
 
@@ -32,15 +32,15 @@ Startup (when `api.py` is imported) calls `pipeline.index_documents`: each activ
 |---|---|
 | `api.py` | FastAPI routes. `/query` delegates to `pipeline.answer_question`; the index is built at import time by `pipeline.index_documents` (moves to a lifespan handler in P0.3) |
 | `pipeline.py` | `index_documents` (startup indexing) and `answer_question` (the body of `/query`: retrieve, filter, warnings, generate, classify, audit row); `ModelUnavailable` → 503. Shared by the API and the eval |
-| `ingest.py` | Load .txt/.pdf, `clean_text`, `clean_pdf_text`, `chunk_by_article`, legacy `chunk_text`, `load_metadata` (used by `migrate.py`, `calibrate.py`) |
+| `ingest.py` | Load .txt/.pdf, `clean_text`, `clean_pdf_text`, `chunk_document` (structure-aware chunking for `pipeline.py` and `/upload`) and its helpers, `chunk_by_article` (its first step; `calibrate.py` still uses it alone, so the historical calibration reproduces), `chunk_text` (cuts a line over 1,500 characters), `load_metadata` (used by `migrate.py`, `calibrate.py`) |
 | `retrieve.py` | Chroma `build_index`, `search`, `add_to_index` |
 | `generate.py` | `PROMPT_TEMPLATE`, `MODEL` and the Gemini call |
 | `govern.py` | `RELEVANCE_CUTOFF`, `is_expired(review_date, today=None)`, `is_refusal`, `classify` — the tier rules |
 | `db.py` | SQLAlchemy models `AuditEntry` (`audit_log`), `Document` (`documents`) and helpers |
 | `eval_questions.py` | v1 question set (23), untouched; still used by `calibrate.py`. Copied verbatim into `evals/questions_v2.py` |
 | `evals/` | Evaluation v2: `questions_v2.py` (48 frozen questions and labels), `run_eval.py` (runner, cache, retries), `scoring.py` (pure scoring), `seed_eval_db.py` and `eval_db.py` (the `compliance_eval` database and its safety checks), `results/` (committed runs), `cache/` (gitignored) |
-| `tests/`, `pytest.ini` | Unit tests: the eval's scoring (from P0.1); P0.6 adds the rest |
-| `docs/eval/baseline.md` | The P0.1 baseline: numbers per group, every miss with its cause |
+| `tests/`, `pytest.ini` | Unit tests: the eval's scoring (P0.1) and the chunker, `test_ingest.py` (P0.5); P0.6 adds the rest |
+| `docs/eval/` | `baseline.md`: the P0.1 baseline, numbers per group, every miss with its cause. `p0.5.md`: structure-aware chunking against the baseline, with a retrieval-only crowding check |
 | `calibrate.py` | Historical tier-threshold calibration (the thresholds were removed) |
 | `migrate.py` | One-off seed of `documents` from `documents/metadata.json` |
 | `documents/` | Seed documents. `metadata.json` covers only the first three |
@@ -57,7 +57,7 @@ source .venv/bin/activate
 uvicorn api:app --reload                       # http://127.0.0.1:8000 (docs at /docs)
 cd ../compliance-dashboard && npm run dev      # http://localhost:3000
 pip install -r requirements-dev.txt            # app + test tools (pytest, httpx)
-pytest                                         # scoring tests now; the full suite from P0.6
+pytest                                         # scoring and chunker tests now; the full suite from P0.6
 python -m evals.seed_eval_db                   # eval database to its fixed state (EVAL_DATABASE_URL in .env)
 python -m evals.run_eval --label <name>        # eval v2; writes evals/results/<date>-<name>.json
 ```

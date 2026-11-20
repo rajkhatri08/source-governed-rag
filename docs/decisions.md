@@ -266,3 +266,47 @@ Commit: the one that adds this entry.
 - Before and after the refactor, with a fake model and the audit writes captured, all 48 questions gave identical answers, tiers, sources, distances, warnings and audit writes, and the 400 and 503 paths matched.
 - 12 unit tests of the scoring. Seeding the eval database twice gave the same state. A fake-model smoke run checked that a 429 is counted as failed, that a bug stops the run, that the cache hits, and that retries back off and then give up.
 - The baseline, 19 Nov: refusal 36/48, facts 17/34, tier 28/48, no failed calls. Every miss traces to retrieval. 17 questions list Art. 12 among their expected sources and it passed the filter for none of them; half the tier misses (10 of 20) come from a whole-document policy chunk passing the filter, or failing to. Details in `docs/eval/baseline.md`.
+
+---
+
+## 20 Nov 2026 · P0.5: chunks follow each document's structure
+
+Commit: the one that adds this entry.
+
+**Context.** The chunker understood only `Art. N GDPR` headings. That is why, on 30 Aug, two test policies were given invented GDPR headings, "Art. 99 GDPR" and "Art. 100 GDPR", so that they would be chunked (`89010a1`). Both are false: GDPR has 99 articles, Art. 100 doesn't exist, and Art. 99 is "Entry into force and application". The files were public on GitHub. Every other document without those headings became a single chunk. The P0.1 baseline traced every miss to retrieval. Whole, Art. 12 (3,868 characters) passed the filter for none of the 17 questions that need it. Half the tier misses came from a whole-policy chunk passing the filter or failing to.
+
+**Decision.**
+- **Split where the document's own structure splits**, the idea behind article chunking applied one level down and to policies. `ingest.chunk_document` tries three rules in order:
+  1. **Articles.** A line that is exactly `Art. N GDPR` starts an article. An article over 1,500 characters is split before each line starting `N. ` (a numbered paragraph). A lettered list, a sentence number such as "3The" and the "Suitable Recitals" lines stay with their paragraph, because they don't start that way.
+  2. **Sections.** A line starting `Section N.` starts a section.
+  3. **Neither.** Lines are packed into chunks of up to 1,000 characters. A single line over 1,500 is cut by the old `chunk_text` (1,000 characters, 50 overlap).
+- **Every piece carries its context.** The lines before the first heading become a prefix on every piece: the article's heading and title (`Art. 12 GDPR | Transparent information, … | 3. …`), or the policy's title and version (`Data Retention Policy | Version 1.0 | Section 2. …`). A paragraph then says which article and document it comes from, both to the embedding and to the model. The eval's sources metric also relies on each piece containing its heading.
+- **The 1,500-character rule was fixed before measuring**, and all four GDPR articles are over it (12: 3,868; 17: 2,686; 15: 2,197; 33: 1,986), so all four were split: 4 chunks became 20. The baseline had expected only Art. 12 to split.
+- **The two policies were rewritten with honest headings:** a title ("Information Security Policy", "Vendor Management Policy"), "Version 1.0" and `Section 1.` with their original topic line. Every obligation sentence is byte-identical.
+- `chunk_by_article` stays as the first step of `chunk_document`, now anchored to whole heading lines. `calibrate.py` still uses it alone, so its historical result reproduces. `/upload` and startup indexing both call `chunk_document`.
+- **The five regressions stay as measured.** Changing the chunker again after seeing these results would tune it to them. v1-09, 0.003 over the cutoff, belongs to P3.2's cutoff sweep.
+- **The README's opening example now quotes the new distances** (0.673 against 0.837, from 0.743 against 0.894) and says they come from the structure-aware chunker, so it describes the code that is deployed. The expired policy still ranks first.
+
+**Alternatives considered.**
+- **Raising the threshold so that only Art. 12 splits.** It is the smallest change aimed at the measured misses. Rejected: the threshold would have been chosen after looking at the documents, the tuning that pre-registration exists to prevent.
+- **Packing blank-line paragraphs**, as first planned. `clean_text` removes blank lines before chunking, so the fallback can only see lines. In the seed files each paragraph is one line.
+- **An em dash or a hyphen as the prefix separator.** `json.dumps` writes `—` as `—` in the results files read by hand, and a hyphen is ambiguous next to the draft's "0.3 - DRAFT". ` | ` has neither problem.
+- **One section per obligation in the two rewritten policies**, matching the retention policy's layout. Rejected: it would have meant inventing section titles. Only the false heading was replaced.
+- A library text splitter: rejected for the reason in the 22 Aug entry; the boundaries are the point.
+
+**Consequences and limitations.**
+- **Five questions got worse**, each explained in `docs/eval/p0.5.md`. The clearest weakness of paragraph chunks is Art. 17(3), the exceptions to erasure. It opens "Paragraphs 1 and 2 shall not apply …" and depends on paragraph 1, so on its own it no longer reaches two erasure questions (1.203 and 1.471).
+- **The draft AI policy's breach section is further from breach questions than the whole draft was.** On conflict-01 it moved from 1.170 to 1.256, and it now passes for none of the five breach questions (one before). Those tiers come back SILVER, not the labelled BRONZE, and P2.3's compliance card would not see the draft's 24-hour rule there.
+- **Retention §3 (access requests) passes for five GDPR-only request questions** and turns GOLD into SILVER. The whole policy did so for six.
+- **No crowding.** With 26 chunks instead of 6, the top 5 could have filled with one article's paragraphs and pushed out a needed chunk. A retrieval-only check found none (below), so there is no reason yet for a per-document cap.
+- **The sources metric became more lenient for articles and stricter for policies.** Any paragraph of an article contains its heading, so any paragraph counts; only the right policy section counts.
+- **More questions reach the model**: 41 calls against 31, and 10 of the 14 out-of-corpus refusals now come from the model rather than the filter. No out-of-corpus question was answered.
+- **Heading detection is pattern-based.** "Article 5", "§ 3" or "1.1" fall back to line packing.
+- `clean_pdf_text` replaces the `ﬁ` and `ﬂ` ligatures but not `ﬀ` (`gdpr1.pdf` reads "aﬀect"). Noticed here, not fixed (→ P0.6).
+
+**How it was verified.**
+- 14 new unit tests (`tests/test_ingest.py`) cover each rule and its edge cases: lettered lists, sentence numbers, recitals, an article citation that isn't a heading, packing order and overlap, empty text. They also check the seed files: 20 GDPR pieces, each naming its article, and each policy's sections under its title with no "GDPR" in any of them. The security and vendor cases failed on the invented headings until the files were rewritten. All 26 tests pass.
+- The chunks of all six seed files were printed before and after: 4 → 20 (`gdpr_ch3.txt`, and `gdpr1.pdf` alike), 1 → 3 (retention, draft), 1 → 1 (security, vendor). The longest piece is 1,391 characters. Stripping the prefixes and joining the pieces gives back each old chunk's text, in order.
+- `calibrate.py` printed the same result as before (1.02, 17 of 23, 73.9%).
+- **Evaluation v2, 20 Nov** (`evals/results/2026-11-20-p0.5.json`). The questions, prompt, model, cutoff and top-5 are the same as in the baseline; only the corpus changed. Refusal 36 → 41 of 48, facts 17 → 26 of 34, tier 28 → 31 of 48, sources 12 → 22 of 34, 0 failed calls. Group by group in `docs/eval/p0.5.md`. The paraphrase group's tier fell from 4/8 to 2/8.
+- **The crowding check** ranked all 26 chunks for every question, with no model calls. No expected source and no answer-holding chunk was under the cutoff but below 5th, before or after. Its per-question results match both eval runs row by row on the sources metric.

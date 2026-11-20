@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_by_article
+from ingest import load_document, load_pdf, clean_text, clean_pdf_text, chunk_document
 from retrieve import add_to_index
 from govern import is_expired
 from db import read_log_db, read_documents, set_approved, set_retired, add_document
@@ -92,7 +92,7 @@ async def upload(
         text = load_document(path)
 
     cleaned = clean_text(text)
-    doc_chunks = chunk_by_article(cleaned)
+    doc_chunks = chunk_document(cleaned)
 
     metas = []
     for chunk in doc_chunks:
