@@ -63,7 +63,8 @@ FastAPI (Render)
 | `govern.py` | Expiry check and tier classification |
 | `db.py` | SQLAlchemy models, audit log, document metadata |
 | `api.py` | FastAPI endpoints |
-| `evaluate.py` | 23-question evaluation harness with result caching |
+| `pipeline.py` | The question-answering pipeline, shared by the API and the evaluation |
+| `evals/` | Evaluation v2: 48 pre-registered questions, the harness and its scoring |
 | `calibrate.py` | Threshold calibration against the labelled set |
 | `migrate.py` | One-off migration of document metadata into Postgres |
 
@@ -162,7 +163,7 @@ The thresholds were removed. The tier now rests only on the model's own refusal 
 
 The out-of-corpus questions are deliberately plausible. Testing with obviously unrelated questions proves nothing; the useful cases are the ones that sound like they belong to the document but are not in it.
 
-`evaluate.py` caches results keyed on question plus chunk count, so re-running an unchanged configuration costs no API calls while changing the chunking strategy correctly invalidates the cache.
+**Evaluation v2** (`evals/`) keeps these 23 questions verbatim and adds 25 more (casual paraphrases, one question per governance state, conflicting deadlines and harder out-of-corpus cases), all labelled before any run and then frozen. It calls the same function as `/query`, against a dedicated database seeded to a fixed governance state with a fixed date, and scores refusals, expected facts and tiers automatically, each over a fixed denominator. The first run ([docs/eval/baseline.md](docs/eval/baseline.md)) refuses correctly on 36 of 48 questions, includes the expected facts in 17 of 34 answers, and gives the expected tier on 28 of 48. These are lower than the chunking results above, which came from an earlier harness that sent the top 3 chunks to the model with no relevance filter and was scored by hand. Every miss traces to retrieval: either the chunk with the answer did not pass the 1.2 cutoff, or a whole-document policy chunk passed it, or failed to, and changed the tier.
 
 ---
 
@@ -233,9 +234,9 @@ These are real and worth stating plainly.
 
 **The 1.2 relevance cutoff was chosen by inspection**, not calibration. Unlike the tier thresholds, it has not been measured, and it is a known weak point. Short, casually phrased questions produce weaker embedding matches than formally worded ones and can fall outside it even when the corpus does answer them.
 
-**The evaluation set is 23 questions**, all written by one person. Large enough to compare chunking strategies against each other; too small to claim an absolute accuracy figure with confidence.
+**The evaluation set is 48 questions**, all written and labelled by one person. An answer's facts are checked by substring, which can pass a wrong answer that contains the phrase ("not 72 hours") and miss a correct one worded differently. Large enough to compare configurations against each other on the same questions; too small to claim an absolute accuracy figure with confidence.
 
-**No unit tests.** The evaluation harness tests retrieval quality end to end, but nothing checks that `chunk_by_article` handles a document with no headings, or that `is_expired` handles a malformed date.
+**Few unit tests.** Only the evaluation's scoring is unit-tested so far. Nothing yet checks that `chunk_by_article` handles a document with no headings, or that `is_expired` handles a malformed date.
 
 **The chunker is GDPR-specific.** It matches `Art. N GDPR` headings. A document without them becomes a single chunk. A general system needs structure detection per document type with a character-based fallback.
 

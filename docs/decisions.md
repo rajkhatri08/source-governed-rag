@@ -235,3 +235,34 @@ Commit: the one that adds this file.
 - When google-genai or chromadb needs a different httpx, the pin must move; pip reports the conflict.
 
 **How it was verified.** `git branch --show-current` printed `upgrade` in both repos before any file was written. Both branches were pushed, and `git branch -vv` shows each tracking `origin/upgrade`. `pip install -r requirements-dev.txt` found every package in `requirements.txt` and httpx 0.28.1 already installed at their pinned versions, and added only pytest 9.2.0 and the two packages it needs, pluggy 1.7.0 and iniconfig 2.3.1. `pip check` found no broken requirements, `pytest --version` printed `pytest 9.2.0`, and `from fastapi.testclient import TestClient` imports. The Render dashboard shows no deploy after 17 Nov, so pushing `upgrade` deployed nothing.
+
+---
+
+## 19 Nov 2026 · P0.1: the evaluation runs the production code path
+
+Commit: the one that adds this entry.
+
+**Context.** The v1 evaluation (`evaluate.py`) measured a different pipeline from `/query`. It sent the top 3 chunks to the model with no relevance filter, indexed from `metadata.json` instead of Postgres, never scored tiers, and its accuracy was counted by hand. The README's chunking figures (78%, 90%, 95%) describe that harness, not what production does.
+
+**Decision.**
+- One code path. `pipeline.answer_question` holds what `/query` did, and `/query` is a thin wrapper around it; startup indexing moved to `pipeline.index_documents`. The API and the evaluation build and query the index with the same code.
+- A dedicated eval database, `compliance_eval`, set to a fixed governance state by `evals/seed_eval_db.py`, and a fixed date (2026-11-18), so results don't change by themselves when a review date passes. The scripts refuse any other database name and any Neon host.
+- 48 pre-registered questions in `evals/questions_v2.py`: v1's 23 verbatim plus 25 new ones. Each carries expected sources, facts and tier; the conflict questions also carry the floor and each policy's verdict, for P2.4. The labels follow one rule: a document counts for a question when its text makes a claim about that exact question. The author reviewed every label against the document text, made five fixes, and froze the set before any real answer was seen.
+- Automatic scoring (`evals/run_eval.py`, `evals/scoring.py`): refusal, expected facts as case-insensitive phrases, and tier, each over a denominator fixed by the labels. A model call that still fails after retrying 429s and 503s is counted as failed, never as wrong. Answers are cached on the question, the exact chunk ids and hashes, the prompt template's hash and the model name.
+
+**Alternatives considered.**
+- Fixing `evaluate.py` in place: it would still have been a second copy of the pipeline, drifting whenever `/query` changed. It was deleted.
+- Grading answers with a second model: harder to see when it is wrong, and it makes the evaluation depend on another model. Phrase matching is crude but transparent.
+- Running against the development database: its governance state changes as documents are approved and retired, so results would drift.
+
+**Consequences and limitations.**
+- One person wrote every question and label, and 48 questions is small. Phrase matching can pass a wrong answer that contains the phrase and fail a correct one worded differently.
+- The model is not deterministic. The committed results file is the record; the cache is local and gitignored.
+- The cache invalidates by design when chunk ids, the prompt or the chunking change (→ P0.2, P0.4, P0.5).
+- `answer_question` still reports any generation failure as "model unavailable", as before (→ P0.4).
+- The fake-model smoke run, done before the labels were frozen, showed which questions retrieve nothing under the cutoff. No question was reworded because of it.
+
+**How it was verified.**
+- Before and after the refactor, with a fake model and the audit writes captured, all 48 questions gave identical answers, tiers, sources, distances, warnings and audit writes, and the 400 and 503 paths matched.
+- 12 unit tests of the scoring. Seeding the eval database twice gave the same state. A fake-model smoke run checked that a 429 is counted as failed, that a bug stops the run, that the cache hits, and that retries back off and then give up.
+- The baseline, 19 Nov: refusal 36/48, facts 17/34, tier 28/48, no failed calls. Every miss traces to retrieval. 17 questions list Art. 12 among their expected sources and it passed the filter for none of them; half the tier misses (10 of 20) come from a whole-document policy chunk passing the filter, or failing to. Details in `docs/eval/baseline.md`.

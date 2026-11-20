@@ -1,0 +1,4656 @@
+{
+ "run": {
+  "label": "baseline",
+  "run_date": "2026-11-19",
+  "eval_today": "2026-11-18",
+  "model": "gemini-3.6-flash",
+  "prompt_template_sha256": "af6c0fd51fb6b114b9cddfd5efd2c4e34f8798a7bb736a7605c87a50ca8a789e",
+  "top_k": 5,
+  "relevance_cutoff": 1.2,
+  "git": {
+   "commit": "19514c5",
+   "uncommitted_changes": true
+  },
+  "questions_sha256": "839e2d037b5c21c82b5410fb3b27a52421d7b33f8c0220cd1d171c7035a33fa5",
+  "corpus_sha256": "38a2e47daada58c6c51fb345df56b61249c210b34281bec2bf2595f3399f6820",
+  "chunks_indexed": 6,
+  "model_calls": 31,
+  "cache_hits": 0
+ },
+ "summary": {
+  "v1-answerable": {
+   "questions": 10,
+   "failed": 0,
+   "refusal": {
+    "correct": 7,
+    "wrong": 3,
+    "failed": 0,
+    "n": 10
+   },
+   "facts": {
+    "correct": 7,
+    "wrong": 3,
+    "failed": 0,
+    "n": 10
+   },
+   "tier": {
+    "correct": 4,
+    "wrong": 6,
+    "failed": 0,
+    "n": 10
+   },
+   "sources": {
+    "correct": 5,
+    "wrong": 5,
+    "failed": 0,
+    "n": 10
+   }
+  },
+  "overall": {
+   "questions": 48,
+   "failed": 0,
+   "refusal": {
+    "correct": 36,
+    "wrong": 12,
+    "failed": 0,
+    "n": 48
+   },
+   "facts": {
+    "correct": 17,
+    "wrong": 17,
+    "failed": 0,
+    "n": 34
+   },
+   "tier": {
+    "correct": 28,
+    "wrong": 20,
+    "failed": 0,
+    "n": 48
+   },
+   "sources": {
+    "correct": 12,
+    "wrong": 22,
+    "failed": 0,
+    "n": 34
+   }
+  },
+  "v1-out_of_corpus": {
+   "questions": 10,
+   "failed": 0,
+   "refusal": {
+    "correct": 10,
+    "wrong": 0,
+    "failed": 0,
+    "n": 10
+   },
+   "facts": {
+    "correct": 0,
+    "wrong": 0,
+    "failed": 0,
+    "n": 0
+   },
+   "tier": {
+    "correct": 10,
+    "wrong": 0,
+    "failed": 0,
+    "n": 10
+   },
+   "sources": {
+    "correct": 0,
+    "wrong": 0,
+    "failed": 0,
+    "n": 0
+   }
+  },
+  "v1-conflicted": {
+   "questions": 3,
+   "failed": 0,
+   "refusal": {
+    "correct": 2,
+    "wrong": 1,
+    "failed": 0,
+    "n": 3
+   },
+   "facts": {
+    "correct": 1,
+    "wrong": 2,
+    "failed": 0,
+    "n": 3
+   },
+   "tier": {
+    "correct": 1,
+    "wrong": 2,
+    "failed": 0,
+    "n": 3
+   },
+   "sources": {
+    "correct": 0,
+    "wrong": 3,
+    "failed": 0,
+    "n": 3
+   }
+  },
+  "paraphrase": {
+   "questions": 8,
+   "failed": 0,
+   "refusal": {
+    "correct": 5,
+    "wrong": 3,
+    "failed": 0,
+    "n": 8
+   },
+   "facts": {
+    "correct": 3,
+    "wrong": 5,
+    "failed": 0,
+    "n": 8
+   },
+   "tier": {
+    "correct": 4,
+    "wrong": 4,
+    "failed": 0,
+    "n": 8
+   },
+   "sources": {
+    "correct": 2,
+    "wrong": 6,
+    "failed": 0,
+    "n": 8
+   }
+  },
+  "governance": {
+   "questions": 3,
+   "failed": 0,
+   "refusal": {
+    "correct": 2,
+    "wrong": 1,
+    "failed": 0,
+    "n": 3
+   },
+   "facts": {
+    "correct": 2,
+    "wrong": 1,
+    "failed": 0,
+    "n": 3
+   },
+   "tier": {
+    "correct": 2,
+    "wrong": 1,
+    "failed": 0,
+    "n": 3
+   },
+   "sources": {
+    "correct": 2,
+    "wrong": 1,
+    "failed": 0,
+    "n": 3
+   }
+  },
+  "conflict": {
+   "questions": 6,
+   "failed": 0,
+   "refusal": {
+    "correct": 4,
+    "wrong": 2,
+    "failed": 0,
+    "n": 6
+   },
+   "facts": {
+    "correct": 2,
+    "wrong": 4,
+    "failed": 0,
+    "n": 6
+   },
+   "tier": {
+    "correct": 3,
+    "wrong": 3,
+    "failed": 0,
+    "n": 6
+   },
+   "sources": {
+    "correct": 1,
+    "wrong": 5,
+    "failed": 0,
+    "n": 6
+   }
+  },
+  "no_conflict_expected": {
+   "questions": 4,
+   "failed": 0,
+   "refusal": {
+    "correct": 2,
+    "wrong": 2,
+    "failed": 0,
+    "n": 4
+   },
+   "facts": {
+    "correct": 2,
+    "wrong": 2,
+    "failed": 0,
+    "n": 4
+   },
+   "tier": {
+    "correct": 0,
+    "wrong": 4,
+    "failed": 0,
+    "n": 4
+   },
+   "sources": {
+    "correct": 2,
+    "wrong": 2,
+    "failed": 0,
+    "n": 4
+   }
+  },
+  "out_of_corpus_hard": {
+   "questions": 4,
+   "failed": 0,
+   "refusal": {
+    "correct": 4,
+    "wrong": 0,
+    "failed": 0,
+    "n": 4
+   },
+   "facts": {
+    "correct": 0,
+    "wrong": 0,
+    "failed": 0,
+    "n": 0
+   },
+   "tier": {
+    "correct": 4,
+    "wrong": 0,
+    "failed": 0,
+    "n": 4
+   },
+   "sources": {
+    "correct": 0,
+    "wrong": 0,
+    "failed": 0,
+    "n": 0
+   }
+  }
+ },
+ "rows": [
+  {
+   "id": "v1-01",
+   "group": "v1-answerable",
+   "question": "how long does a controller have to notify a breach",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 2."
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "72 hours",
+     "72-hour",
+     "seventy-two hours"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how long does a controller have to notify a breach",
+    "answer": "Based on the provided context, a controller must notify the supervisory authority of a personal data breach **without undue delay and, where feasible, not later than 72 hours** after becoming aware of it (unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons). \n\nIf the notification is not made within 72 hours, it must be accompanied by reasons for the delay.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_3",
+     "chunk_4"
+    ],
+    "distances": [
+     0.8677527904510498,
+     1.0547752380371094
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [],
+    "missing_sources": [
+     [
+      "draft_ai_policy.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8677527904510498,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0547752380371094,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8677527904510498,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0547752380371094,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3437848091125488,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.448891520500183,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.524384617805481,
+     "first_line": "Art. 15 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-02",
+   "group": "v1-answerable",
+   "question": "can I ask a company to delete my data",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "erasure",
+     "erase",
+     "right to be forgotten"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can I ask a company to delete my data",
+    "answer": "Yes. Under Article 17 of the GDPR (Right to erasure), a data subject has the right to obtain from the controller the erasure of their personal data without undue delay when specific grounds apply, such as:\n\n* The personal data are no longer necessary for the purposes for which they were collected or processed.\n* You withdraw your consent (where processing was based on consent) and there is no other legal ground for processing.\n* You object to the processing and there are no overriding legitimate grounds for it.\n* The personal data have been unlawfully processed.\n* The data must be erased to comply with a legal obligation in Union or Member State law.\n* The data were collected in relation to the offer of information society services referred to in Article 8(1).\n\nArticle 15(1)(e) also confirms the existence of the right to request erasure of personal data from the controller. \n\nHowever, this right does not apply if the processing is necessary for specific reasons outlined in Article 17(3), such as exercising the right of freedom of expression and information, complying with a legal obligation, reasons of public interest in public health, archiving/research purposes in the public interest, or establishing, exercising, or defending legal claims.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_2",
+     "chunk_4",
+     "chunk_1"
+    ],
+    "distances": [
+     1.011538028717041,
+     1.0945813655853271,
+     1.0970008373260498
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.011538028717041,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0945813655853271,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0970008373260498,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.011538028717041,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0945813655853271,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0970008373260498,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2604560852050781,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3443645238876343,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-03",
+   "group": "v1-answerable",
+   "question": "what information can I request about my own data",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 15 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "purpose"
+    ],
+    [
+     "recipient"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "what information can I request about my own data",
+    "answer": "Based on the provided context (Art. 15 GDPR), you have the right to obtain confirmation as to whether or not your personal data are being processed, access to that personal data, a copy of the personal data undergoing processing, and the following specific information:\n\n* **Confirmation and access:** Confirmation of whether your personal data are being processed, and access to that data.\n* **Purposes:** The purposes of the processing.\n* **Categories:** The categories of personal data concerned.\n* **Recipients:** The recipients or categories of recipients to whom the personal data have been or will be disclosed (especially recipients in third countries or international organisations).\n* **Storage Period:** Where possible, the envisaged period for which the personal data will be stored, or the criteria used to determine that period.\n* **Your Rights:** The existence of the right to request rectification, erasure, restriction of processing, or to object to such processing.\n* **Complaints:** The right to lodge a complaint with a supervisory authority.\n* **Data Source:** Any available information as to the source of the personal data, if it was not collected directly from you.\n* **Automated Decision-Making:** The existence of automated decision-making (including profiling), along with meaningful information about the logic involved and the significance and envisaged consequences of such processing for you.\n* **International Transfer Safeguards:** If personal data are transferred to a third country or international organisation, information regarding the appropriate safeguards (pursuant to Article 46) relating to the transfer.",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_1",
+     "chunk_0"
+    ],
+    "distances": [
+     0.8836835026741028,
+     1.1432466506958008
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8836835026741028,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1432466506958008,
+     "first_line": "Art. 12 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8836835026741028,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1432466506958008,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.204662561416626,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2602665424346924,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3759039640426636,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-04",
+   "group": "v1-answerable",
+   "question": "do companies have to provide the information for free",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "free of charge",
+     "no charge",
+     "without charge",
+     "no cost"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "do companies have to provide the information for free",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "free of charge",
+      "no charge",
+      "without charge",
+      "no cost"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3136706352233887,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3874537944793701,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4197232723236084,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.5500335693359375,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5508360862731934,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-05",
+   "group": "v1-answerable",
+   "question": "what happens if a company ignores my data request",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "supervisory authority",
+     "complaint"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "what happens if a company ignores my data request",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_2",
+     "chunk_1",
+     "chunk_3"
+    ],
+    "distances": [
+     1.109713077545166,
+     1.110870122909546,
+     1.1433119773864746
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "supervisory authority",
+      "complaint"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.109713077545166,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.110870122909546,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1433119773864746,
+     "first_line": "Art. 33 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.109713077545166,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.110870122909546,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1433119773864746,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2730188369750977,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.2742619514465332,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-06",
+   "group": "v1-answerable",
+   "question": "when can a company refuse my right to be forgotten",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ],
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "freedom of expression",
+     "legal obligation",
+     "public interest",
+     "public health",
+     "archiving",
+     "legal claims",
+     "manifestly unfounded",
+     "excessive"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "when can a company refuse my right to be forgotten",
+    "answer": "Based on the provided context, the right to erasure ('right to be forgotten') does not apply\u2014meaning a controller/company can refuse it\u2014to the extent that processing the data is necessary:\n\n1. **For exercising the right of freedom of expression and information;**\n2. **For compliance with a legal obligation** requiring processing by Union or Member State law to which the controller is subject, or for the performance of a task carried out in the public interest or in the exercise of official authority vested in the controller;\n3. **For reasons of public interest in the area of public health** (in accordance with points (h) and (i) of Article 9(2) as well as Article 9(3));\n4. **For archiving purposes in the public interest, scientific or historical research purposes, or statistical purposes** (in accordance with Article 89(1)), in so far as the right to erasure is likely to render impossible or seriously impair the achievement of the objectives of that processing; or\n5. **For the establishment, exercise, or defence of legal claims.**",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_2"
+    ],
+    "distances": [
+     1.116028070449829
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.116028070449829,
+     "first_line": "Art. 17 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.116028070449829,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.248427152633667,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3433500528335571,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4152863025665283,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5393664836883545,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-07",
+   "group": "v1-answerable",
+   "question": "how quickly does a company need to respond to an access request",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "result": {
+    "question": "how quickly does a company need to respond to an access request",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ],
+     [
+      "retention_policy_v1.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3677244186401367,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3711323738098145,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4066872596740723,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.416413426399231,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.511487603187561,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-08",
+   "group": "v1-answerable",
+   "question": "do I have the right to know who my data was shared with",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 15 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "recipient"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "do I have the right to know who my data was shared with",
+    "answer": "Yes. According to Article 15(1)(c), the data subject has the right to obtain information from the controller regarding \"the recipients or categories of recipient to whom the personal data have been or will be disclosed, in particular recipients in third countries or international organisations.\" \n\nAdditionally, under Article 15(2), if personal data is transferred to a third country or an international organisation, the data subject has the right to be informed of the appropriate safeguards relating to the transfer.",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_1",
+     "chunk_0",
+     "chunk_2"
+    ],
+    "distances": [
+     0.9250975251197815,
+     1.1397678852081299,
+     1.1793458461761475
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9250975251197815,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1397678852081299,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1793458461761475,
+     "first_line": "Art. 17 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9250975251197815,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1397678852081299,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1793458461761475,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2346718311309814,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4341745376586914,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-09",
+   "group": "v1-answerable",
+   "question": "can my data be kept if it is needed for legal claims",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "defence of legal claims",
+     "defense of legal claims",
+     "defend legal claims",
+     "exercise or defence"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can my data be kept if it is needed for legal claims",
+    "answer": "Yes. According to Article 17(3)(e) of the GDPR, the obligation to erase personal data does not apply to the extent that processing the data is necessary for the establishment, exercise, or defence of legal claims.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_1",
+     "chunk_2",
+     "chunk_0",
+     "chunk_4"
+    ],
+    "distances": [
+     0.9395254850387573,
+     0.9429921507835388,
+     1.1411325931549072,
+     1.1607887744903564
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9395254850387573,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9429921507835388,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1411325931549072,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1607887744903564,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9395254850387573,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9429921507835388,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1411325931549072,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1607887744903564,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3883336782455444,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-10",
+   "group": "v1-answerable",
+   "question": "what details must be included when reporting a leak to authorities",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "nature"
+    ],
+    [
+     "consequence"
+    ],
+    [
+     "measure"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "what details must be included when reporting a leak to authorities",
+    "answer": "Based on the provided context, the notification to the supervisory authority must at least include:\n\n1. **The nature of the breach**, including (where possible) the categories and approximate number of data subjects concerned, as well as the categories and approximate number of personal data records concerned.\n2. **Contact details**, specifically the name and contact details of the data protection officer or another contact point where more information can be obtained.\n3. **Likely consequences**, describing the probable effects of the personal data breach.\n4. **Measures taken or proposed**, describing the actions taken or proposed by the controller to address the breach, including (where appropriate) measures to mitigate its possible adverse effects.\n\nAdditionally, if the notification is not made within 72 hours of becoming aware of the breach, it must be accompanied by the **reasons for the delay**.",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_3"
+    ],
+    "distances": [
+     1.0990654230117798
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0990654230117798,
+     "first_line": "Art. 33 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0990654230117798,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2791911363601685,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.285591721534729,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3625156879425049,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4493616819381714,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-11",
+   "group": "v1-out_of_corpus",
+   "question": "what is the maximum fine under GDPR",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what is the maximum fine under GDPR",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2164359092712402,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2323930263519287,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2980163097381592,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3056085109710693,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.4325758218765259,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-12",
+   "group": "v1-out_of_corpus",
+   "question": "what are the rules for transferring data outside the EU",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what are the rules for transferring data outside the EU",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2270811796188354,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.303036093711853,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4080168008804321,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4285897016525269,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4673855304718018,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-13",
+   "group": "v1-out_of_corpus",
+   "question": "who must appoint a data protection officer",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "who must appoint a data protection officer",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_1",
+     "chunk_0"
+    ],
+    "distances": [
+     1.0670878887176514,
+     1.1660568714141846
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0670878887176514,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1660568714141846,
+     "first_line": "Art. 12 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0670878887176514,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1660568714141846,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2168817520141602,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2679188251495361,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.2872483730316162,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-14",
+   "group": "v1-out_of_corpus",
+   "question": "what is the minimum age for a child to consent to data processing",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what is the minimum age for a child to consent to data processing",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_0",
+     "chunk_1"
+    ],
+    "distances": [
+     1.057189702987671,
+     1.1731271743774414
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.057189702987671,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1731271743774414,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.057189702987671,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1731271743774414,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2921526432037354,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3105543851852417,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4895105361938477,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-15",
+   "group": "v1-out_of_corpus",
+   "question": "are small businesses exempt from keeping processing records",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "are small businesses exempt from keeping processing records",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_2"
+    ],
+    "distances": [
+     1.180086374282837
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.180086374282837,
+     "first_line": "Art. 17 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.180086374282837,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3540363311767578,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4382730722427368,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4525823593139648,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.561281681060791,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-16",
+   "group": "v1-out_of_corpus",
+   "question": "how do I perform a Data Protection Impact Assessment",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how do I perform a Data Protection Impact Assessment",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.246062159538269,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2960214614868164,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3950167894363403,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.417454481124878,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4505951404571533,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-17",
+   "group": "v1-out_of_corpus",
+   "question": "can a company process my data based on legitimate interest",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "can a company process my data based on legitimate interest",
+    "answer": "I don't know. The provided context only covers Article 15 of the GDPR (the right of access by the data subject) and does not contain information about whether a company can process data based on legitimate interest.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_1"
+    ],
+    "distances": [
+     1.081538200378418
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.081538200378418,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.081538200378418,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2785181999206543,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3605613708496094,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3773441314697266,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3911161422729492,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-18",
+   "group": "v1-out_of_corpus",
+   "question": "who is the lead supervisory authority for a multinational business",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "who is the lead supervisory authority for a multinational business",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.644129753112793,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6987122297286987,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.7914230823516846,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.8302059173583984,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.9598331451416016,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-19",
+   "group": "v1-out_of_corpus",
+   "question": "are biometric fingerprints considered special category data",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "are biometric fingerprints considered special category data",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.495941162109375,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.7226879596710205,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.7262027263641357,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.7482774257659912,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.7582945823669434,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-20",
+   "group": "v1-out_of_corpus",
+   "question": "what are the strict rules for using website tracking cookies",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what are the strict rules for using website tracking cookies",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.532426118850708,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5331493616104126,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5673964023590088,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.7125575542449951,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.7244036197662354,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-21",
+   "group": "v1-conflicted",
+   "question": "how long do we have to report a data breach",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 2."
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "72 hours",
+     "72-hour",
+     "seventy-two hours"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how long do we have to report a data breach",
+    "answer": "Based on the provided context, the timeframe depends on who is being notified:\n\n* **Internal Policy (Data Protection Officer):** Must be notified within **30 days** of discovery.\n* **GDPR (Supervisory Authority):** The controller must notify the supervisory authority without undue delay and, where feasible, no later than **72 hours** after becoming aware of the breach. \n* **Processor to Controller (GDPR):** The processor must notify the controller **without undue delay**.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_4",
+     "chunk_3"
+    ],
+    "distances": [
+     0.7427098751068115,
+     0.8940109014511108
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [],
+    "missing_sources": [
+     [
+      "draft_ai_policy.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.7427098751068115,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8940109014511108,
+     "first_line": "Art. 33 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.7427098751068115,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8940109014511108,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.272742748260498,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3016749620437622,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3048665523529053,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v1-22",
+   "group": "v1-conflicted",
+   "question": "how long do we have to respond to an access request",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "result": {
+    "question": "how long do we have to respond to an access request",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ],
+     [
+      "retention_policy_v1.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.2136321067810059,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.2272002696990967,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2502261400222778,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.313521385192871,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3423798084259033,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v1-23",
+   "group": "v1-conflicted",
+   "question": "how quickly must AI-related data requests be answered",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 2."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how quickly must AI-related data requests be answered",
+    "answer": "Within 14 days of receipt.",
+    "tier": "BRONZE",
+    "reason": "source not approved: draft_ai_policy.txt",
+    "warnings": [
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_5"
+    ],
+    "distances": [
+     0.7202863693237305
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 0.7202863693237305,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 0.7202863693237305,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3057477474212646,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3165521621704102,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3770196437835693,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.47355318069458,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-01",
+   "group": "paraphrase",
+   "question": "will my data be shared?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 15 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "recipient"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "will my data be shared?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "recipient"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 15 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2037395238876343,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2685344219207764,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3323791027069092,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3745818138122559,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.4696305990219116,
+     "first_line": "Data Retention Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-02",
+   "group": "paraphrase",
+   "question": "how fast do I have to report a leak",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 2."
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "72 hours",
+     "72-hour",
+     "seventy-two hours"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how fast do I have to report a leak",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "72 hours",
+      "72-hour",
+      "seventy-two hours"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 33 GDPR"
+     ],
+     [
+      "retention_policy_v1.txt",
+      "Section 2."
+     ],
+     [
+      "draft_ai_policy.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2424609661102295,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.2972118854522705,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.4634039402008057,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5623618364334106,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6195003986358643,
+     "first_line": "Art. 15 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-03",
+   "group": "paraphrase",
+   "question": "can I get my data deleted",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "erasure",
+     "erase",
+     "right to be forgotten"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can I get my data deleted",
+    "answer": "Yes. Under Article 17 of the GDPR, you (as a data subject) have the right to obtain the erasure of your personal data without undue delay if one of the following grounds applies:\n\n* The personal data are no longer necessary for the purposes for which they were collected or processed.\n* You withdraw your consent (where processing was based on consent) and there is no other legal ground for processing.\n* You object to the processing pursuant to Article 21(1) and there are no overriding legitimate grounds, or you object pursuant to Article 21(2).\n* The personal data have been unlawfully processed.\n* The data must be erased to comply with a legal obligation in Union or Member State law.\n* The personal data were collected in relation to the offer of information society services referred to in Article 8(1).\n\n**Exceptions:** \nThis right does not apply to the extent that processing is necessary for specific reasons, including:\n* Exercising the right of freedom of expression and information.\n* Compliance with a legal obligation or performance of a task in the public interest/official authority.\n* Reasons of public interest in public health.\n* Archiving, scientific/historical research, or statistical purposes in the public interest.\n* The establishment, exercise, or defence of legal claims.\n\nAdditionally, under the provided **Data Retention Policy**, customer transaction records are automatically deleted after a period of three years from the date of the transaction.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_2",
+     "chunk_4",
+     "chunk_1"
+    ],
+    "distances": [
+     0.9360381364822388,
+     1.1153233051300049,
+     1.1758214235305786
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9360381364822388,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1153233051300049,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1758214235305786,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.9360381364822388,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1153233051300049,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1758214235305786,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3385696411132812,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4138931035995483,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-04",
+   "group": "paraphrase",
+   "question": "is asking for my data free",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "free of charge",
+     "no charge",
+     "without charge",
+     "no cost"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "is asking for my data free",
+    "answer": "Based on the provided context, the controller must provide a copy of the personal data undergoing processing. However, for any **further copies** requested by the data subject, the controller may charge a reasonable fee based on administrative costs.",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_1"
+    ],
+    "distances": [
+     1.1252202987670898
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "free of charge",
+      "no charge",
+      "without charge",
+      "no cost"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1252202987670898,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1252202987670898,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3423649072647095,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.342888593673706,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3668479919433594,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3949683904647827,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-05",
+   "group": "paraphrase",
+   "question": "what can I find out about my data",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 15 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "purpose"
+    ],
+    [
+     "recipient"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "what can I find out about my data",
+    "answer": "Based on the provided text, you have the right to obtain confirmation as to whether or not your personal data is being processed, access to that personal data, a copy of the personal data undergoing processing, and the following information:\n\n* **Purposes of processing:** The reasons why your data is being processed.\n* **Categories of data:** The categories of personal data concerned.\n* **Recipients:** The recipients or categories of recipients to whom the data has been or will be disclosed (especially recipients in third countries or international organisations).\n* **Storage period:** The envisaged period for which the personal data will be stored, or the criteria used to determine that period.\n* **Your rights:** The existence of your right to request rectification, erasure, or restriction of processing of your personal data, or to object to such processing.\n* **Complaints:** Your right to lodge a complaint with a supervisory authority.\n* **Data source:** Any available information regarding the source of the data, if it was not collected directly from you.\n* **Automated decision-making:** The existence of automated decision-making (including profiling), along with meaningful information about the logic involved, and the significance and envisaged consequences of such processing for you.\n* **Transfer safeguards:** Information regarding the appropriate safeguards in place if your personal data is transferred to a third country or an international organisation.",
+    "tier": "GOLD",
+    "reason": "answered from an approved, current source",
+    "warnings": [],
+    "sources": [
+     "chunk_1"
+    ],
+    "distances": [
+     1.1800198554992676
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1800198554992676,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1800198554992676,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2824649810791016,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4580949544906616,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.483694076538086,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4967344999313354,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-06",
+   "group": "paraphrase",
+   "question": "how long do they have to send me my data",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "result": {
+    "question": "how long do they have to send me my data",
+    "answer": "Based on the provided context, requests from data subjects for access to their personal data will be processed within **60 days of receipt** (Section 3 of the Data Retention Policy).",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_4",
+     "chunk_3",
+     "chunk_1"
+    ],
+    "distances": [
+     0.9892646074295044,
+     1.1208606958389282,
+     1.1376900672912598
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.9892646074295044,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1208606958389282,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1376900672912598,
+     "first_line": "Art. 15 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.9892646074295044,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1208606958389282,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1376900672912598,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2332051992416382,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.2991312742233276,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-07",
+   "group": "paraphrase",
+   "question": "can they say no to deleting my stuff",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ],
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "freedom of expression",
+     "legal obligation",
+     "public interest",
+     "public health",
+     "archiving",
+     "legal claims",
+     "manifestly unfounded",
+     "excessive"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can they say no to deleting my stuff",
+    "answer": "Yes. According to Art. 17(3), a request for erasure does not apply to the extent that processing the data is necessary:\n\n* For exercising the right of freedom of expression and information;\n* For compliance with a legal obligation or for the performance of a task carried out in the public interest or in the exercise of official authority;\n* For reasons of public interest in the area of public health;\n* For archiving purposes in the public interest, scientific or historical research purposes, or statistical purposes (where erasure is likely to render impossible or seriously impair those objectives); or\n* For the establishment, exercise, or defence of legal claims.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_2",
+     "chunk_4"
+    ],
+    "distances": [
+     1.1740567684173584,
+     1.1866788864135742
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1740567684173584,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1866788864135742,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.1740567684173584,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1866788864135742,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3283648490905762,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4315999746322632,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.4791353940963745,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-paraphrase-08",
+   "group": "paraphrase",
+   "question": "what if they ignore my request",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "supervisory authority",
+     "complaint"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "what if they ignore my request",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "supervisory authority",
+      "complaint"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4624354839324951,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.499969244003296,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5064711570739746,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5099178552627563,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5219131708145142,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-governance-01",
+   "group": "governance",
+   "question": "how long must customer transaction records be kept?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "retention_policy_v1.txt",
+     "Section 1."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "three years",
+     "3 years"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "result": {
+    "question": "how long must customer transaction records be kept?",
+    "answer": "Customer transaction records must be kept for a period of three years from the date of the transaction.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_4"
+    ],
+    "distances": [
+     0.6793826818466187
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.6793826818466187,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.6793826818466187,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.218458652496338,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4029479026794434,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4145770072937012,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5632532835006714,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-governance-02",
+   "group": "governance",
+   "question": "what does our AI usage policy apply to?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "draft_ai_policy.txt",
+     "Section 1."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "artificial intelligence",
+     "ai system"
+    ],
+    [
+     "personal data"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what does our AI usage policy apply to?",
+    "answer": "Based on the provided context, the policy applies to (governs) the use of artificial intelligence systems that process personal data.",
+    "tier": "BRONZE",
+    "reason": "source not approved: draft_ai_policy.txt",
+    "warnings": [
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_5"
+    ],
+    "distances": [
+     0.5059712529182434
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 0.5059712529182434,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 0.5059712529182434,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.345475196838379,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3806501626968384,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5870096683502197,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5939688682556152,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-governance-03",
+   "group": "governance",
+   "question": "does a company have to use plain language when it tells me about my rights?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "concise",
+     "intelligible",
+     "easily accessible",
+     "transparent",
+     "clear and plain"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "does a company have to use plain language when it tells me about my rights?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "concise",
+      "intelligible",
+      "easily accessible",
+      "transparent",
+      "clear and plain"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3908765316009521,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.426600694656372,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.6070932149887085,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6189954280853271,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6964871883392334,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-01",
+   "group": "conflict",
+   "question": "what is our deadline for reporting a personal data breach?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 2."
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "72 hours",
+     "72-hour",
+     "seventy-two hours"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "expected_conflict": {
+    "topic": "breach_notification",
+    "floor": "72 hours",
+    "verdicts": {
+     "retention_policy_v1.txt": "gap",
+     "draft_ai_policy.txt": "not_in_force"
+    }
+   },
+   "result": {
+    "question": "what is our deadline for reporting a personal data breach?",
+    "answer": "Based on the provided context, the deadline depends on the specific framework, recipient, and circumstances:\n\n* **Under Art. 33 GDPR (to the supervisory authority):** The controller must notify the supervisory authority without undue delay and, where feasible, **not later than 72 hours** after becoming aware of it (unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons). If acting as a processor, the processor must notify the controller **without undue delay**.\n* **Under the Data Retention Policy (internal notification):** The Data Protection Officer (DPO) must be notified **within 30 days** of discovery.\n* **Under the Draft AI Usage Policy (Draft, Not Approved):** A breach involving an AI system must be reported to the supervisory authority **within 24 hours** of discovery.",
+    "tier": "BRONZE",
+    "reason": "source not approved: draft_ai_policy.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt",
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_3",
+     "chunk_4",
+     "chunk_1",
+     "chunk_5"
+    ],
+    "distances": [
+     0.7703185081481934,
+     1.0078661441802979,
+     1.142202377319336,
+     1.1702194213867188
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": true,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.7703185081481934,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0078661441802979,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.142202377319336,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1702194213867188,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.7703185081481934,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0078661441802979,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.142202377319336,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1702194213867188,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2617461681365967,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-02",
+   "group": "conflict",
+   "question": "we've had a data breach, how quickly must it be notified?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 33 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 2."
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "72 hours",
+     "72-hour",
+     "seventy-two hours"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "expected_conflict": {
+    "topic": "breach_notification",
+    "floor": "72 hours",
+    "verdicts": {
+     "retention_policy_v1.txt": "gap",
+     "draft_ai_policy.txt": "not_in_force"
+    }
+   },
+   "result": {
+    "question": "we've had a data breach, how quickly must it be notified?",
+    "answer": "Based on the provided context, the notification timeframe depends on who is being notified and by whom:\n\n* **To the supervisory authority (by the controller):** Without undue delay and, where feasible, not later than **72 hours** after becoming aware of it (unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons). If notified after 72 hours, reasons for the delay must be provided.\n* **To the controller (by the processor):** Without undue delay after becoming aware of the breach.\n* **To the Data Protection Officer (under the Data Retention Policy):** Within **30 days** of discovery.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_3",
+     "chunk_4"
+    ],
+    "distances": [
+     0.7444494962692261,
+     0.8376221060752869
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [],
+    "missing_sources": [
+     [
+      "draft_ai_policy.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.7444494962692261,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.8376221060752869,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.7444494962692261,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.8376221060752869,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.254766583442688,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4664175510406494,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.534700870513916,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-03",
+   "group": "conflict",
+   "question": "what is the deadline for answering a subject access request?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "expected_conflict": {
+    "topic": "data_subject_request",
+    "floor": "one month",
+    "verdicts": {
+     "retention_policy_v1.txt": "gap"
+    }
+   },
+   "result": {
+    "question": "what is the deadline for answering a subject access request?",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_5"
+    ],
+    "distances": [
+     1.1817954778671265
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ],
+     [
+      "retention_policy_v1.txt",
+      "Section 3."
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1817954778671265,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1817954778671265,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3013005256652832,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3130559921264648,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4374496936798096,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4803298711776733,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-04",
+   "group": "conflict",
+   "question": "how many days do we have to process a request for someone's personal data?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "retention_policy_v1.txt",
+     "Section 3."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "SILVER",
+   "expected_conflict": {
+    "topic": "data_subject_request",
+    "floor": "one month",
+    "verdicts": {
+     "retention_policy_v1.txt": "gap"
+    }
+   },
+   "result": {
+    "question": "how many days do we have to process a request for someone's personal data?",
+    "answer": "According to Section 3 of the Data Retention Policy, requests from data subjects for access to their personal data will be processed within **60 days** of receipt. \n\n*(Note: If the request specifically relates to automated decision-making, Section 2 of the Draft AI Usage Policy specifies a timeframe of 14 days).*",
+    "tier": "BRONZE",
+    "reason": "source not approved: draft_ai_policy.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt",
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_1",
+     "chunk_4",
+     "chunk_3",
+     "chunk_2",
+     "chunk_5"
+    ],
+    "distances": [
+     0.8824152946472168,
+     0.8866804242134094,
+     1.0195101499557495,
+     1.069851279258728,
+     1.1440143585205078
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8824152946472168,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.8866804242134094,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0195101499557495,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.069851279258728,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1440143585205078,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8824152946472168,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 0.8866804242134094,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0195101499557495,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.069851279258728,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.1440143585205078,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-05",
+   "group": "conflict",
+   "question": "how quickly must we answer a request about automated decision-making?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 2."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "expected_conflict": {
+    "topic": "data_subject_request",
+    "floor": "one month",
+    "verdicts": {
+     "draft_ai_policy.txt": "not_in_force"
+    }
+   },
+   "result": {
+    "question": "how quickly must we answer a request about automated decision-making?",
+    "answer": "Based on the context provided, requests relating to automated decision-making must be answered within 14 days of receipt.",
+    "tier": "BRONZE",
+    "reason": "source not approved: draft_ai_policy.txt",
+    "warnings": [
+     "unapproved source: draft_ai_policy.txt"
+    ],
+    "sources": [
+     "chunk_5"
+    ],
+    "distances": [
+     1.0049524307250977
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.0049524307250977,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.0049524307250977,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4233901500701904,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4534608125686646,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.5436298847198486,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5537998676300049,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-conflict-06",
+   "group": "conflict",
+   "question": "someone is challenging a decision our algorithm made about them, how long do we have to respond?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ],
+    [
+     "draft_ai_policy.txt",
+     "Section 2."
+    ]
+   ],
+   "expected_facts": [
+    [
+     "one month",
+     "1 month",
+     "a month"
+    ]
+   ],
+   "expected_tier": "BRONZE",
+   "expected_conflict": {
+    "topic": "data_subject_request",
+    "floor": "one month",
+    "verdicts": {
+     "draft_ai_policy.txt": "not_in_force"
+    }
+   },
+   "result": {
+    "question": "someone is challenging a decision our algorithm made about them, how long do we have to respond?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": true,
+    "sources": false,
+    "missing_facts": [
+     [
+      "one month",
+      "1 month",
+      "a month"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ],
+     [
+      "draft_ai_policy.txt",
+      "Section 2."
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.2726867198944092,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5008788108825684,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.6117602586746216,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6270060539245605,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6971724033355713,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-no_conflict_expected-01",
+   "group": "no_conflict_expected",
+   "question": "can a company refuse a request that is manifestly unfounded or excessive?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "fee",
+     "refuse to act",
+     "burden"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can a company refuse a request that is manifestly unfounded or excessive?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "fee",
+      "refuse to act",
+      "burden"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4545459747314453,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5474839210510254,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5783311128616333,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6095738410949707,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6634221076965332,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-no_conflict_expected-02",
+   "group": "no_conflict_expected",
+   "question": "can a company ask me for ID before dealing with my request?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 12 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "additional information",
+     "reasonable doubts",
+     "identity"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "can a company ask me for ID before dealing with my request?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": false,
+    "facts": false,
+    "tier": false,
+    "sources": false,
+    "missing_facts": [
+     [
+      "additional information",
+      "reasonable doubts",
+      "identity"
+     ]
+    ],
+    "missing_sources": [
+     [
+      "gdpr_ch3.txt",
+      "Art. 12 GDPR"
+     ]
+    ]
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.3808178901672363,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3951685428619385,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4293490648269653,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.526831030845642,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5697921514511108,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-no_conflict_expected-03",
+   "group": "no_conflict_expected",
+   "question": "if a company made my data public, does it have to tell others to delete it?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "reasonable steps",
+     "inform other controllers",
+     "inform controllers"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "if a company made my data public, does it have to tell others to delete it?",
+    "answer": "Yes. Under Art. 17(2) of the GDPR, if a controller (company) has made your personal data public and is obliged to erase it under paragraph 1, it must take reasonable steps\u2014including technical measures, taking into account available technology and implementation costs\u2014to inform other controllers processing the personal data that you have requested the erasure of any links to, or copies or replications of, that data.",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_2",
+     "chunk_1",
+     "chunk_4"
+    ],
+    "distances": [
+     1.0402480363845825,
+     1.0492357015609741,
+     1.1600507497787476
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0402480363845825,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0492357015609741,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1600507497787476,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0402480363845825,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0492357015609741,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1600507497787476,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2155996561050415,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2338192462921143,
+     "first_line": "Art. 12 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-no_conflict_expected-04",
+   "group": "no_conflict_expected",
+   "question": "on what grounds can I ask for my data to be erased?",
+   "answerable": true,
+   "expected_sources": [
+    [
+     "gdpr_ch3.txt",
+     "Art. 17 GDPR"
+    ]
+   ],
+   "expected_facts": [
+    [
+     "no longer necessary"
+    ],
+    [
+     "consent"
+    ]
+   ],
+   "expected_tier": "GOLD",
+   "result": {
+    "question": "on what grounds can I ask for my data to be erased?",
+    "answer": "Based on the provided context (Art. 17(1) GDPR), you can ask for your personal data to be erased under any of the following grounds:\n\n1. **No longer necessary:** The personal data are no longer necessary in relation to the purposes for which they were collected or otherwise processed.\n2. **Withdrawal of consent:** You withdraw the consent on which the processing is based, and there is no other legal ground for the processing.\n3. **Objection to processing:** You object to the processing pursuant to Article 21(1) and there are no overriding legitimate grounds for the processing, or you object to the processing pursuant to Article 21(2).\n4. **Unlawful processing:** The personal data have been unlawfully processed.\n5. **Legal obligation:** The personal data must be erased for compliance with a legal obligation in Union or Member State law to which the controller is subject.\n6. **Child/Information society services:** The personal data have been collected in relation to the offer of information society services referred to in Article 8(1).",
+    "tier": "SILVER",
+    "reason": "source past review date: retention_policy_v1.txt",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_2",
+     "chunk_1",
+     "chunk_4"
+    ],
+    "distances": [
+     0.6500794887542725,
+     0.978908896446228,
+     1.1142857074737549
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": false,
+    "refusal": true,
+    "facts": true,
+    "tier": false,
+    "sources": true,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.6500794887542725,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.978908896446228,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1142857074737549,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.6500794887542725,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.978908896446228,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1142857074737549,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2079907655715942,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.2146263122558594,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-out_of_corpus_hard-01",
+   "group": "out_of_corpus_hard",
+   "question": "do we have to tell affected customers about a data breach?",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "do we have to tell affected customers about a data breach?",
+    "answer": "Based on the provided context, I don't know. The text covers notification obligations to the supervisory authority (under GDPR Art. 33) and internal reporting to the Data Protection Officer, but it does not specify whether affected customers must be notified.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_3",
+     "chunk_4"
+    ],
+    "distances": [
+     0.8972694277763367,
+     1.1527326107025146
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8972694277763367,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1527326107025146,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 0.8972694277763367,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.1527326107025146,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.386054515838623,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4598453044891357,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.4668774604797363,
+     "first_line": "Art. 17 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-out_of_corpus_hard-02",
+   "group": "out_of_corpus_hard",
+   "question": "can I move my data to another provider?",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "can I move my data to another provider?",
+    "answer": "No sufficiently relevant source found.",
+    "tier": "BRONZE",
+    "reason": "no relevant source in the corpus",
+    "warnings": [],
+    "sources": [],
+    "distances": []
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.526110291481018,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.5339828729629517,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5344250202178955,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5482715368270874,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.6317956447601318,
+     "first_line": "Art. 33 GDPR"
+    }
+   ]
+  },
+  {
+   "id": "v2-out_of_corpus_hard-03",
+   "group": "out_of_corpus_hard",
+   "question": "what security measures do we need to protect personal data?",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "what security measures do we need to protect personal data?",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [],
+    "sources": [
+     "chunk_1",
+     "chunk_3",
+     "chunk_2"
+    ],
+    "distances": [
+     1.0382630825042725,
+     1.0984958410263062,
+     1.166747808456421
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0382630825042725,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0984958410263062,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.166747808456421,
+     "first_line": "Art. 17 GDPR"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0382630825042725,
+     "first_line": "Art. 15 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.0984958410263062,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.166747808456421,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_0",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.256487250328064,
+     "first_line": "Art. 12 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.3848518133163452,
+     "first_line": "Draft AI Usage Policy"
+    }
+   ]
+  },
+  {
+   "id": "v2-out_of_corpus_hard-04",
+   "group": "out_of_corpus_hard",
+   "question": "how long can we keep CCTV recordings?",
+   "answerable": false,
+   "expected_sources": [],
+   "expected_facts": [],
+   "expected_tier": "BRONZE",
+   "result": {
+    "question": "how long can we keep CCTV recordings?",
+    "answer": "I don't know.",
+    "tier": "BRONZE",
+    "reason": "no answer found in the available sources",
+    "warnings": [
+     "expired source: retention_policy_v1.txt"
+    ],
+    "sources": [
+     "chunk_4"
+    ],
+    "distances": [
+     1.0696969032287598
+    ]
+   },
+   "error": null,
+   "scores": {
+    "failed": false,
+    "refused": true,
+    "refusal": true,
+    "facts": null,
+    "tier": true,
+    "sources": null,
+    "missing_facts": [],
+    "missing_sources": []
+   },
+   "passing_chunks": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0696969032287598,
+     "first_line": "Data Retention Policy"
+    }
+   ],
+   "retrieved_before_filter": [
+    {
+     "id": "chunk_4",
+     "source": "retention_policy_v1.txt",
+     "distance": 1.0696969032287598,
+     "first_line": "Data Retention Policy"
+    },
+    {
+     "id": "chunk_2",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.512332797050476,
+     "first_line": "Art. 17 GDPR"
+    },
+    {
+     "id": "chunk_3",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.526045799255371,
+     "first_line": "Art. 33 GDPR"
+    },
+    {
+     "id": "chunk_5",
+     "source": "draft_ai_policy.txt",
+     "distance": 1.5714901685714722,
+     "first_line": "Draft AI Usage Policy"
+    },
+    {
+     "id": "chunk_1",
+     "source": "gdpr_ch3.txt",
+     "distance": 1.5735704898834229,
+     "first_line": "Art. 15 GDPR"
+    }
+   ]
+  }
+ ]
+}
