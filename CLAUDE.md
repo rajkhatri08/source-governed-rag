@@ -36,7 +36,7 @@ Other endpoints: `GET /health`, `GET /documents`, `POST /upload` (multipart; new
   - **Then, for PDFs:** `drop_page_furniture` (a line in a page's first or last 2 lines whose digit-normalised pattern is there on ≥ half of all, odd or even pages, and on ≥ 2; PDFs of ≥ 3 pages); pages joined by one line break; `ingest.join_broken_words` (a hyphen at a line end between lower-case letters); `clean_pdf_text`.
   - **.txt** as UTF-8, with the BOM dropped, line endings normalised and NULs removed.
   - **Then `clean_text`.** No text, or a non-UTF-8 .txt → 422.
-- **Chunks:** `chunk_document`; more than `MAX_CHUNKS` → 413. `MAX_CHUNKS` is the env var `MAX_UPLOAD_CHUNKS`, 300 when unset; a value that isn't a positive whole number stops the app at import (`upload.chunk_limit`).
+- **Chunks:** `chunk_document`; more than `MAX_CHUNKS` → 413. `MAX_CHUNKS` is the env var `MAX_UPLOAD_CHUNKS`, 300 when unset (Render sets 100); a value that isn't a positive whole number stops the app at import (`upload.chunk_limit`).
 
 Each failure is an `UploadRejected(status, message)`. Then:
 1. **Name check.** `db.document_exists` → 409 before anything is embedded. It only saves time; the unique constraint in step 3 decides.
@@ -112,7 +112,7 @@ python -m evals.run_eval --label <name>        # eval v2; writes evals/results/<
 MAX_UPLOAD_CHUNKS=2000 python -m evals.pdf_robustness   # the PDF test set (--extract-only: no model, no database)
 ```
 
-`MAX_UPLOAD_CHUNKS` (optional, `.env` or the shell) sets the upload chunk limit; 300 when unset.
+`MAX_UPLOAD_CHUNKS` (optional, `.env` or the shell) sets the upload chunk limit; 300 when unset. Render sets it to 100, about 5 minutes at most: an upload there takes about 3.0 s per chunk (timed at Ship 1).
 
 - Frontend `.env.local` holds `NEXT_PUBLIC_API_URL`. For local work Raj sets it to `http://127.0.0.1:8000` and restarts `npm run dev` (Next.js reads env files only at start), and sets it back to the Render URL afterwards. Vercel uses its own setting, not this file.
 - If Next.js starts on port 3001, an old dev server still holds 3000, and CORS only allows `http://localhost:3000`. `lsof -i :3000` finds it.
@@ -155,13 +155,7 @@ MAX_UPLOAD_CHUNKS=2000 python -m evals.pdf_robustness   # the PDF test set (--ex
 
 - Schema changes go through **Alembic** (from P0.2). Never use `create_all` to change an existing table. New revision: `alembic revision -m "<what>" --rev-id 000N`, written by hand, then `alembic check` against a database at head.
 - Migrations are **additive** (new nullable columns or new tables, with defaults), so the code already deployed keeps working between "migrate Neon" and "deploy". `downgrade()` raises: a rollback is a redeploy of the old code, never a schema downgrade.
-- State on 22 Nov: local `compliance` and `compliance_eval` are at `0004` with their content and vectors filled (26 chunks each). Neon is not yet stamped. At Ship 1, before any deploy, Raj does the following, each with the `DATABASE_URL='<Neon URL>'` prefix:
-  1. Compares `python print_schema.py` with `migrations/baseline_schema.txt`. Any difference other than a server default on `retired` → stop.
-  2. Runs `alembic stamp 0001`, `alembic upgrade head` (0002, 0003, 0004) and `alembic check`.
-  3. Runs `python backfill_content.py --dry-run`, then `python backfill_content.py --retire-unfillable`.
-  4. Runs `python backfill_vectors.py --dry-run`, then `python backfill_vectors.py` (from his Mac, with the pinned chromadb).
-
-  Only then does the frontend deploy, then the backend. A backend that starts against a database without content indexes nothing; one without stored vectors re-embeds every document at each start (slow, with a "re-embedding" warning per document), and its uploads fail until `0004` is applied. After the deploy: time one upload on Render (the chunk limit's default of 300 assumes about 2 s per chunk, untimed) and watch Render's memory graph during it.
+- State on 22 Nov, after Ship 1: local `compliance` and `compliance_eval` are at `0004` with their content and vectors filled (26 chunks each). Neon is at `0004` too (stamped `0001`, then upgraded; `alembic check` clean), with its content and vectors backfilled. Production runs backend `df13fe5` and frontend `107a1f8`; it started with 4 documents and 27 chunks and no "re-embedding" line. Ship 1's timed upload (`bert_two_column.pdf`: 71 chunks, 3 min 34 s for the whole request) finished without an out-of-memory restart, but Render's free tier shows no memory or CPU graph, so the peak there is unmeasured until P0.4 logs it. A Render deploy or restart takes about 3 minutes.
 - `audit_log` has two time columns: `timestamp` (old, no zone, the writing machine's clock: IST from the Mac, UTC on Render) and `created_at` (UTC, from P0.2).
 - Raj runs migrations and backfills against Neon himself, by hand, during a ship checkpoint. Never do it for him.
 - Tests use a disposable local database; the test setup refuses any URL containing `neon.tech`.

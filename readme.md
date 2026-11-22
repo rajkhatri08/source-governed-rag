@@ -144,7 +144,7 @@ PDF text is extracted with `pypdf` and cleaned in stages:
 - **The owner, version and review date** must fit their columns, and the date must be a real `YYYY-MM-DD`.
 - **The file** must be at most 10 MB, and a PDF at most 300 pages (counted before any text is extracted).
 - **There must be text to extract.** A PDF with no text layer (a scan), a password-protected PDF, a PDF that can't be read, or a .txt that isn't UTF-8 is refused with a message saying which.
-- **The text must fit the chunk limit:** 300 chunks (about 300,000 characters) unless `MAX_UPLOAD_CHUNKS` says otherwise. Embedding is the slow part of an upload, and the free server has a tenth of a CPU.
+- **The text must fit the chunk limit:** 300 chunks (about 300,000 characters) unless `MAX_UPLOAD_CHUNKS` says otherwise. The live server sets 100 chunks (about 100,000 characters): embedding is the slow part of an upload, and there an upload takes about 3 seconds per chunk.
 
 A name that is already taken is refused next, before minutes of embedding are spent on it. Only then are the chunks embedded, and only then are the row, its text and its chunks' vectors inserted, in one transaction. That early name check doesn't decide: Postgres's unique constraint does, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved. One upload is processed at a time; another arriving meanwhile is asked to try again in a minute.
 
@@ -241,7 +241,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | GET | `/health` | Always HTTP 200: `status` (`ok` or `degraded`), whether the database answers, documents and chunks indexed, and the documents that failed to index at startup, each with a reason |
 | POST | `/query` | Ask a question; returns answer, tier, reason, warnings, sources |
 | GET | `/documents` | Document inventory with computed expiry status |
-| POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB, 300 pages and 300 chunks); stored in Postgres with its vectors, indexed immediately, unapproved by default |
+| POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB, 300 pages and 300 chunks, or 100 chunks on the live server); stored in Postgres with its vectors, indexed immediately, unapproved by default |
 | POST | `/documents/{filename}/approve` | Approve a document |
 | POST | `/documents/{filename}/unapprove` | Revoke approval |
 | POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
@@ -270,7 +270,7 @@ These are real and worth stating plainly.
 
 **The index is rebuilt in memory on every start, and nothing limits its total size.** Each start reads every chunk's stored vector from Postgres and adds it to an in-memory ChromaDB collection: 0.6 seconds for 736 chunks, where embedding them again took 53 seconds. But the collection lives in the server's 512 MB, and each upload adds to it. A persistent vector store (for example pgvector) is the scale fix.
 
-**Uploads are slow on the free server.** Embedding takes about 0.2 CPU-seconds per chunk on a laptop. On Render's tenth of a CPU that is probably about 2 seconds per chunk, so a document at the 300-chunk limit may take around 10 minutes. This is estimated, not yet timed on Render.
+**Uploads are slow on the free server.** Embedding takes about 0.2 CPU-seconds per chunk on a laptop. On Render's free instance, a 16-page PDF of 71 chunks took 3 minutes 34 seconds from upload to searchable, about 3 seconds per chunk (timed 22 Nov). The live server therefore limits uploads to 100 chunks, about 5 minutes; a longer document is refused within seconds and must be split into smaller files.
 
 **Tables come through as lines.** pypdf reads a table row by row, and rows are packed into chunks with their neighbours, so a question answered by one row competes with prose on the same topic.
 

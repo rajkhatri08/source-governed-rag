@@ -25,7 +25,7 @@
   - a regulation that collapsed into a single chunk
   - the embedding model being reloaded on every call
   - batch memory that let one upload and one question exceed 512 MB
-- **Embedding is the cost.** It takes about 0.2 CPU-seconds per chunk on this Mac; extraction is fast. On Render's tenth of a CPU, an upload probably takes roughly 2 s per chunk. That's an estimate until it's timed at Ship 1, and it's why the default limit is 300 chunks.
+- **Embedding is the cost.** It takes about 0.2 CPU-seconds per chunk on this Mac; extraction is fast. On Render, timed at Ship 1 (22 Nov), a whole upload takes about 3.0 s per chunk, against an estimate of 2 s: BERT's 71 chunks took 3 min 34 s. So Render runs with a 100-chunk limit, about 5 minutes at most; the code's default stays 300 for local use.
 - **Peak memory** for a 300-chunk upload with a question arriving during it is 280 MB, down from 1,066 MB.
 - **A cold start reads stored vectors.** The index of 736 chunks builds in 0.6 s from stored vectors, against 53.1 s re-embedding (183 CPU-seconds, which would be several minutes on Render).
 
@@ -113,22 +113,24 @@ Lower distance means a closer match; only chunks under 1.2 reach the model, and 
 
 **Embedding takes 137–254 CPU-milliseconds per chunk** on this Mac, about 0.2 on average. Extraction is fast: 3.4 s for the 144 pages of the EU AI Act.
 
-**On Render, untimed.** Render's free instance has a tenth of a CPU. If its core were as fast as this Mac's, an upload would take about 2 s per chunk, roughly ten times its CPU-seconds:
+**On Render, timed at Ship 1 (22 Nov).** Uploading `bert_two_column.pdf` (16 pages, 71 chunks) to the free instance took 3 min 34 s for the whole request: transfer, extraction, embedding and the database write. That is about 3.0 s per chunk, 1.5 times the 2 s estimated from this Mac (a tenth of a CPU, so ten times the CPU-seconds). The other rows assume the time grows in proportion to the chunks, at 3.0 s each:
 
-| Upload | Estimate on Render |
-|---|---|
-| NIST AI RMF, 129 chunks | 5 minutes |
-| a document at the 300-chunk default | 10 minutes |
-| the EU AI Act, 708 chunks | 25 minutes |
+| Upload | Chunks | On Render |
+|---|---|---|
+| `bert_two_column.pdf` | 71 | 3 min 34 s, measured |
+| a document at Render's limit | 100 | about 5 minutes |
+| `nist_ai_rmf_1.0.pdf` | 129 | about 6½ minutes; measured: refused at Render's limit within seconds |
+| a document at the code's default limit | 300 | about 15 minutes |
+| `eu_ai_act.pdf` | 708 | about 35 minutes |
 
-This is an estimate. Render's core may be slower, or allowed to burst, so the first upload at Ship 1 should be timed.
+The upload finished without an out-of-memory restart, but Render's free tier shows no memory or CPU graph, so the peak there is unmeasured; P0.4 logs each upload's chunk count, seconds and peak memory. The time covers the whole request, so it doesn't separate embedding from the other steps either.
 
 **The limits:**
 - 10 MB per file (413)
 - 300 pages (413), checked before any text is extracted
-- `MAX_UPLOAD_CHUNKS` chunks (413), 300 when unset: about 300,000 characters
+- `MAX_UPLOAD_CHUNKS` chunks (413), 300 when unset: about 300,000 characters. Render sets 100.
 
-The page limit rarely binds, because the chunk limit refuses long documents first. The chunk limit can be raised locally (the EU AI Act needs 708), and on Render once an upload has been timed there.
+The page limit rarely binds, because the chunk limit refuses long documents first. The chunk limit can be raised locally (the EU AI Act needs 708); on Render it was lowered to 100 once an upload had been timed there.
 
 **Texts per model call, embedding the same 300 chunks.** Each size ran in a fresh process, measured after the model was loaded. The vectors were bit-identical at every size.
 
@@ -155,7 +157,7 @@ The page limit rarely binds, because the chunk limit refuses long documents firs
 - **At the shipped default,** an upload with a question during it stays within the memory the server holds anyway.
 - **Larger documents** add memory for their parsing and their rows: 392 MB for 708 chunks.
 - **What the index costs at rest isn't pinned down.** Ready memory rose by 97 MB with the EU AI Act's 708 chunks (287 → 384 MB). In an earlier run it rose by 161 MB with 4,129 synthetic chunks (359 → 520 MB). macOS's figures give no reliable cost per chunk; what is certain is that the index grows with every upload, and there is no limit on the total.
-- **Render.** Today's Render startup already survives one batch of 32 texts. Check Render's memory graph at Ship 1 during an upload.
+- **Render.** At Ship 1 the 71-chunk upload finished without an out-of-memory restart. Render's free tier shows no memory graph, so the peak there is unmeasured until P0.4 logs it.
 
 ## Startup
 
@@ -170,7 +172,7 @@ The page limit rarely binds, because the chunk limit refuses long documents firs
 
 ## What this doesn't show
 
-- **Render.** Its speed and memory are estimated from this Mac, not measured; Ship 1 times an upload and watches the memory graph.
+- **Render.** Its speed comes from one timed upload (the whole request, not embedding alone), and its memory isn't measured: the free tier has no memory graph.
 - **Coverage.** Ten questions on five PDFs, written by one person: enough to catch the failures above, not to claim an accuracy rate on arbitrary PDFs.
 - **Scans.** A scanned PDF is refused, not read: there is no OCR.
 - **Tables and two-column layouts** come through as lines, in pypdf's reading order.
