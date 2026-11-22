@@ -533,3 +533,26 @@ Commit: the one that adds this entry. Measurements: [docs/eval/pdf_robustness.md
   - 10 of 10 questions answered correctly (5 of 6 before words were rejoined)
   - peak memory for a 300-chunk upload with a question during it: 280 MB (1,066 MB before)
   - a start from 736 stored vectors in 0.6 s, against 53.1 s re-embedding
+
+---
+
+## 22 Nov 2026 · Ship 1: a 100-chunk upload limit on Render
+
+Commits: `5c77ebd` (the docs updated with the measurement) and the one that adds this entry. The limit itself is set in Render's environment, not in any commit.
+
+**Context.** P0.3b set the chunk limit's default to 300 from an estimate of about 2 s per chunk on Render (about 10 minutes for 300 chunks), to be timed at Ship 1. At Ship 1, uploading `bert_two_column.pdf` (16 pages, 71 chunks) to production took 3 min 34 s for the whole request: about 3.0 s per chunk. At that rate a 300-chunk upload would take about 15 minutes.
+
+**Decision.** Render runs with `MAX_UPLOAD_CHUNKS=100`, set as an environment variable, so an upload there takes about 5 minutes at most. The code's default stays 300 for local use, where 300 chunks embed in about 17 seconds on a laptop.
+
+**Alternatives considered.**
+- **Keep 300 on Render.** An upload could take about 15 minutes, and every other upload would get a 503 meanwhile, since one upload runs at a time.
+- **Lower the default in the code.** Local runs would lose the headroom they use to measure longer documents, and P0.3b made the limit a setting so that it could be tuned without a code change.
+- **Background indexing, or a paid instance with more CPU.** Either would let longer documents through. Background indexing needs an upload status the dashboard can poll and a way to report a failure after the request has returned; a paid instance costs money. Both are bigger steps than a setting.
+
+**Consequences and limitations.**
+- A document over 100 chunks (about 100,000 characters) is refused within seconds, before anything is embedded, and must be split into smaller files. At Ship 1, `nist_ai_rmf_1.0.pdf` (129 chunks) was refused this way.
+- Production's limit lives in Render's settings, not in the repository; `CLAUDE.md` and the README record both values.
+- The 3.0 s comes from one upload and covers the whole request, not embedding alone. Render's memory peak is unmeasured: the free tier shows no memory graph (→ P0.4).
+- Revisit with background indexing or a paid instance if 100 chunks proves too few.
+
+**How it was verified.** On production at Ship 1: the 71-chunk upload finished without an out-of-memory restart, and after a restart `/health` showed 5 documents and 98 chunks with no "re-embedding" line. With the limit at 100, `nist_ai_rmf_1.0.pdf` was refused within seconds.
