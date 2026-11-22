@@ -24,44 +24,65 @@ Tier rules (`govern.py`), in order: model refused → BRONZE · any relevant sou
 
 Other endpoints: `GET /health`, `GET /documents`, `POST /upload` (multipart; new documents unapproved), `POST /documents/{filename}/approve|unapprove|retire`, `GET /audit`.
 
-`POST /upload` (a plain `def`, so it runs in a worker thread) reads at most 10 MB + 1 byte, then `upload.prepare_upload` runs every check before anything is stored, cheapest first:
+`POST /upload` (a plain `def`, so it runs in a worker thread) takes `api.UPLOAD_LOCK` without waiting (another upload in progress → 503 "another upload is being indexed"), reads at most 10 MB + 1 byte, then `upload.prepare_upload` runs every check before anything is stored, cheapest first:
 - **Name:** NFC-normalised. Letters, digits and combining marks in any script, plus space and `. _ - ( ) & , ' + ’ ‘ – —`. No `/ \ : # ? %` or control characters; no leading dot; ≤200 characters; `.pdf`/`.txt` in any case.
 - **Fields:** owner ≤100, version ≤50, a real `YYYY-MM-DD`.
 - **Size:** ≤10 MB, else 413.
-- **Text** (`extract_text`): PDFs in memory via pypdf; .txt as UTF-8, with the BOM dropped, line endings normalised and NULs removed; then `clean_text`. No text, an unreadable PDF or a non-UTF-8 .txt → 422.
-- **Chunks:** `chunk_document`.
+- **Text** (`extract_text`).
+  - **PDFs, in memory via pypdf** (`pdf_pages`):
+    - password-protected (the empty password fails) → 422;
+    - more than 300 pages → 413, before any text is read;
+    - any other pypdf failure → 422, logged (a broad `except` around the pypdf calls only).
+  - **Then, for PDFs:** `drop_page_furniture` (a line in a page's first or last 2 lines whose digit-normalised pattern is there on ≥ half of all, odd or even pages, and on ≥ 2; PDFs of ≥ 3 pages); pages joined by one line break; `ingest.join_broken_words` (a hyphen at a line end between lower-case letters); `clean_pdf_text`.
+  - **.txt** as UTF-8, with the BOM dropped, line endings normalised and NULs removed.
+  - **Then `clean_text`.** No text, or a non-UTF-8 .txt → 422.
+- **Chunks:** `chunk_document`; more than `MAX_CHUNKS` → 413. `MAX_CHUNKS` is the env var `MAX_UPLOAD_CHUNKS`, 300 when unset; a value that isn't a positive whole number stops the app at import (`upload.chunk_limit`).
 
-Each failure is an `UploadRejected(status, message)`. Then `db.insert_document` stores the row and its `content` in one transaction; a duplicate is Postgres's unique violation (SQLSTATE 23505 on `documents`), giving `DuplicateDocument` → 409. Then `pipeline.index_document`; if that fails, `db.delete_document` removes the row → 500 "nothing was saved". Nothing is written to disk.
+Each failure is an `UploadRejected(status, message)`. Then:
+1. **Name check.** `db.document_exists` → 409 before anything is embedded. It only saves time; the unique constraint in step 3 decides.
+2. **Embed.** `retrieve.embed(chunks)`; a failure → 500 "nothing was saved", and nothing was stored.
+3. **Insert.** `db.insert_document` stores the row, its `content` and its `document_chunks` rows (`pipeline.chunk_rows`) in one transaction. A duplicate that passed the name check (two simultaneous uploads) is Postgres's unique violation (SQLSTATE 23505 on `documents`), giving `DuplicateDocument` → the same 409.
+4. **Index.** `pipeline.index_document` with those vectors. If that fails, `db.delete_document` removes the row (its chunks cascade) → 500 "nothing was saved".
+
+Nothing is written to disk.
+
+Embedding: one `ONNXMiniLM_L6_V2` instance, `retrieve.EMBEDDER` (Chroma's default model), serves startup, uploads and questions.
+- **The index's distance:** `new_index` passes it as the collection's embedding function with L2 pinned (`DISTANCE`); Chroma would pick cosine for it, and the 1.2 cutoff assumes L2.
+- **Batching:** `embed` sends `EMBED_BATCH` = 1 chunk per model call. That measured as the least memory and CPU; the vectors are bit-identical at any batch size.
+- **The model name:** `EMBEDDING_MODEL` is stored with every vector.
 
 Startup is a FastAPI lifespan handler (importing `api.py` touches neither the database nor Gemini):
-- It creates the Gemini client and an empty index (`retrieve.new_index`).
-- It reads `db.read_documents_to_index()` (non-retired rows with their stored `content`), retrying `OperationalError` after 1, 2, 4 and 8 s, then failing fast: startup stops and Render restarts it.
-- `pipeline.index_documents(collection, docs)` indexes each document separately and returns the filenames indexed and the failures (`{filename, reason}`: "no stored content" or "indexing failed").
+- It loads the embedding model first (`embed(["warm-up"])`; a failure is logged and the first question retries), then creates the Gemini client and an empty index (`retrieve.new_index`).
+- It reads `db.read_documents_to_index()` (non-retired rows with their id and stored `content`), retrying `OperationalError` after 1, 2, 4 and 8 s, then failing fast: startup stops and Render restarts it.
+- `pipeline.index_documents(collection, docs)` indexes each document separately.
+  - **Vectors.** Each document is chunked, then `stored_embeddings` reads its vectors (`db.read_stored_vectors`, one document at a time). They are used only if every chunk has one with the same id, full hash and `EMBEDDING_MODEL`. Otherwise it logs "re-embedding <file>" and calls `retrieve.embed`; a `SQLAlchemyError` reading them also falls back to embedding.
+  - **The result:** the filenames indexed and the failures (`{filename, reason}`: "no stored content" or "indexing failed").
 - The results go on `app.state`: `client`, `collection`, `indexed_documents`, `failed_documents`.
 
 `GET /health` always returns 200: `{"status": "ok"|"degraded", "database": <SELECT 1 succeeds>, "documents_indexed", "chunks_indexed", "failed_documents"}`. The engine uses `pool_pre_ping` (Neon closes connections when it sleeps) and `connect_timeout=10`. `documents/` is seed data only.
 
-Indexing chunks each document with `ingest.chunk_document`, which follows the document's structure: a GDPR article over 1,500 characters becomes one chunk per numbered paragraph, a policy one chunk per `Section N.`, each piece prefixed with its heading and title (`Art. 12 GDPR | <title> | 3. …`); a document with neither is packed line by line into chunks of up to 1,000 characters. Each chunk's id is `{filename}::{index}::{sha256(text)[:12]}` (`retrieve.make_chunk_id`, built for startup and `/upload` alike by `pipeline.chunk_ids_and_metadata`), so ids are the same after every restart; its Chroma metadata carries `chunk_index` and the full `content_hash`.
+Indexing chunks each document with `ingest.chunk_document`, which follows the document's structure: a GDPR article over 1,500 characters becomes one chunk per numbered paragraph, a policy one chunk per `Section N.`, each piece prefixed with its heading and title (`Art. 12 GDPR | <title> | 3. …`); a document with neither is packed line by line into chunks of up to 1,000 characters. Since P0.3b, the lines before the first heading are a title only if ≤300 characters (`MAX_TITLE_CHARS`; longer, they are packed as content), and no chunk exceeds 1,500 characters (a longer piece is packed line by line): a wrapped "Section 2." cross-reference once made the 144-page EU AI Act a single chunk. Each chunk's id is `{filename}::{index}::{sha256(text)[:12]}` (`retrieve.make_chunk_id`, built for startup and `/upload` alike by `pipeline.chunk_ids_and_metadata`), so ids are the same after every restart; its Chroma metadata carries `chunk_index` and the full `content_hash`.
 
 ## Files (backend)
 
 | File | Role |
 |---|---|
-| `api.py` | FastAPI routes and the lifespan handler (startup: read the stored text with retries, index it, keep the results on `app.state`). `/query` delegates to `pipeline.answer_question`; `/upload` is prepare → insert → index |
-| `upload.py` | `prepare_upload` and its checks (`check_filename`, `check_fields`, `check_size`, `extract_text`, `pdf_pages`, `decode_text`), the limits, `UploadRejected(status, message)`, `PreparedUpload`. Writes nothing. `extract_text` is also used by `backfill_content.py` and `seed_eval_db.py`, so stored text is extracted one way |
+| `api.py` | FastAPI routes and the lifespan handler (startup: load the embedding model, read the stored text with retries, index it from stored vectors, keep the results on `app.state`). `/query` delegates to `pipeline.answer_question`; `/upload` holds `UPLOAD_LOCK` and calls `process_upload`: prepare → name check → embed → insert → index |
+| `upload.py` | `prepare_upload` and its checks (`check_filename`, `check_fields`, `check_size`, `extract_text`, `pdf_pages`, `decode_text`, `check_chunk_count`), the page furniture rule (`line_pattern`, `edge_positions`, `edge_patterns_on_half`, `page_furniture`, `drop_page_furniture`), the limits (`MAX_PAGES`, `chunk_limit` and `MAX_CHUNKS` from `MAX_UPLOAD_CHUNKS`), `UploadRejected(status, message)`, `PreparedUpload`. Writes nothing. `extract_text` is also used by `backfill_content.py` and `seed_eval_db.py`, so stored text is extracted one way |
 | `backfill_content.py` | Fills `documents.content` for rows without it, from `documents/<filename>` (only files really inside `documents/`: an old row named `../.env` can't pull in a secret). One transaction, idempotent; `--dry-run`, `--retire-unfillable` |
-| `pipeline.py` | `chunk_ids_and_metadata` (ids and Chroma metadata for one document's chunks), `index_document` (one document; startup and `/upload`), `index_documents` (startup: each document separately, returns indexed and failed) and `answer_question` (the body of `/query`: retrieve, filter, warnings, generate, classify, audit row); `ModelUnavailable` → 503. Shared by the API and the eval |
-| `ingest.py` | `load_document` (a seed .txt by path, for `calibrate.py` and the tests), `clean_text`, `clean_pdf_text`, `chunk_document` (structure-aware chunking) and its helpers, `chunk_by_article` (its first step; `calibrate.py` still uses it alone, so the historical calibration reproduces), `chunk_text` (cuts a line over 1,500 characters), `load_metadata` (used by `migrate.py`, `calibrate.py`) |
-| `retrieve.py` | `content_hash`, `make_chunk_id`; Chroma `new_index` (an empty collection), `add_to_index` (ids from the caller), `search` |
+| `backfill_vectors.py` | Stores the missing `document_chunks` rows (vectors from `retrieve.embed`) for every active document with content; `store_missing_vectors` is also used by `seed_eval_db.py`. One transaction, idempotent; `--dry-run` counts without embedding |
+| `pipeline.py` | `chunk_ids_and_metadata` (ids and Chroma metadata for one document's chunks), `chunk_rows` (its `document_chunks` rows), `index_document` (one document with its vectors; startup and `/upload`), `stored_embeddings`, `index_documents` (startup: each document separately, stored vectors or re-embedding; returns indexed and failed) and `answer_question` (the body of `/query`: retrieve, filter, warnings, generate, classify, audit row); `ModelUnavailable` → 503. Shared by the API and the eval |
+| `ingest.py` | `load_document` (a seed .txt by path, for `calibrate.py` and the tests), `clean_text`, `clean_pdf_text`, `join_broken_words` (P0.3b), `chunk_document` (structure-aware chunking, no chunk over 1,500 characters) and its helpers, `chunk_by_article` (its first step; `calibrate.py` still uses it alone, so the historical calibration reproduces), `chunk_text` (cuts a line over 1,500 characters), `load_metadata` (used by `migrate.py`, `calibrate.py`) |
+| `retrieve.py` | `content_hash`, `make_chunk_id`; `EMBEDDER` (the one embedding model), `EMBEDDING_MODEL`, `DISTANCE` (L2, pinned), `EMBED_BATCH`, `embed`; Chroma `new_index` (an empty collection), `add_to_index` (ids and vectors from the caller), `search` |
 | `generate.py` | `PROMPT_TEMPLATE`, `MODEL` and the Gemini call |
 | `govern.py` | `RELEVANCE_CUTOFF`, `is_expired(review_date, today=None)`, `is_refusal`, `classify` — the tier rules |
-| `db.py` | SQLAlchemy models `AuditEntry` (`audit_log`), `Document` (`documents`) and helpers; `new_audit_entry` and `audit_entry_to_dict` build and read an audit row without a database; `insert_document` (duplicate → `DuplicateDocument`, from `is_unique_violation`), `delete_document`, `read_documents_to_index`, `database_reachable`. No `init_db`: schema comes from the migrations |
-| `alembic.ini`, `migrations/` | Alembic. `env.py` (engine from `os.getenv("DATABASE_URL")`; `-x db=eval` targets the eval database), `versions/` (`0001` baseline, `0002` audit `answer`, `chunks`, `created_at`, `0003` `documents.content`, `content_sha256`, `created_at`), `baseline_schema.txt` (what 0001 creates, as `print_schema.py` prints it). Downgrades refuse by design |
+| `db.py` | SQLAlchemy models `AuditEntry` (`audit_log`), `Document` (`documents`), `DocumentChunk` (`document_chunks`: id, text, hash, `REAL[]` vector, model; unique on chunk id + model; cascades from its document) and helpers; `new_audit_entry` and `audit_entry_to_dict` build and read an audit row without a database; `document_exists` (the quick name check before embedding), `insert_document` (with its chunk rows, one transaction; duplicate → `DuplicateDocument`, from `is_unique_violation`), `delete_document`, `read_documents_to_index`, `read_stored_vectors`, `database_reachable`. No `init_db`: schema comes from the migrations |
+| `alembic.ini`, `migrations/` | Alembic. `env.py` (engine from `os.getenv("DATABASE_URL")`; `-x db=eval` targets the eval database), `versions/` (`0001` baseline, `0002` audit `answer`, `chunks`, `created_at`, `0003` `documents.content`, `content_sha256`, `created_at`, `0004` the `document_chunks` table), `baseline_schema.txt` (what 0001 creates, as `print_schema.py` prints it). Downgrades refuse by design |
 | `print_schema.py` | Read-only schema print (`SET TRANSACTION READ ONLY`; host and revision to stderr), to compare a database with `migrations/baseline_schema.txt` before `alembic stamp 0001` |
 | `eval_questions.py` | v1 question set (23), untouched; still used by `calibrate.py`. Copied verbatim into `evals/questions_v2.py` |
-| `evals/` | Evaluation v2: `questions_v2.py` (48 frozen questions and labels), `run_eval.py` (runner, cache, retries), `scoring.py` (pure scoring), `seed_eval_db.py` and `eval_db.py` (the `compliance_eval` database and its safety checks), `results/` (committed runs), `cache/` (gitignored) |
-| `tests/`, `pytest.ini` | Unit tests, none touching a database or the model: the eval's scoring (P0.1), the chunker (`test_ingest.py`, P0.5), chunk ids (`test_ids.py`), the audit row (`test_audit.py`), `answer_question`'s audit write and startup indexing against fakes (`test_pipeline.py`), every upload check (`test_upload.py`), `/upload` and `/health` through `TestClient` without the lifespan (`test_api.py`), duplicate detection (`test_db.py`). `pdf_samples.py` builds test PDFs in memory. P0.6 adds the rest |
-| `docs/eval/` | `baseline.md`: the P0.1 baseline, numbers per group, every miss with its cause. `p0.5.md`: structure-aware chunking against the baseline, with a retrieval-only crowding check |
+| `evals/` | Evaluation v2: `questions_v2.py` (48 frozen questions and labels), `run_eval.py` (runner, cache, retries), `scoring.py` (pure scoring), `seed_eval_db.py` and `eval_db.py` (the `compliance_eval` database, with its vectors, and its safety checks), `results/` (committed runs), `cache/` (gitignored). The PDF test set (P0.3b): `fixtures/pdfs/` (two synthetic PDFs committed; the public ones in `local/`, gitignored, sources and sha256 in its README), `pdf_questions.py` (two frozen questions per PDF), `pdf_robustness.py` (the measurement; `--extract-only` needs no model or database) |
+| `tests/`, `pytest.ini` | Unit tests, none touching a database or the model: the eval's scoring (P0.1), the chunker and `join_broken_words` (`test_ingest.py`), chunk ids (`test_ids.py`), the audit row (`test_audit.py`), `answer_question`'s audit write and startup indexing with or without stored vectors against fakes (`test_pipeline.py`), every upload check and the furniture rule (`test_upload.py`), `/upload` (rejections, the name check, order, 503) and `/health` through `TestClient` without the lifespan (`test_api.py`), duplicate detection (`test_db.py`), `embed`'s batching and the index's distance (`test_retrieve.py`). `pdf_samples.py` builds test PDFs (multi-page, encrypted) and texts in memory. P0.6 adds the rest |
+| `docs/eval/` | `baseline.md`: the P0.1 baseline, numbers per group, every miss with its cause. `p0.5.md`: structure-aware chunking against the baseline, with a retrieval-only crowding check. `pdf_robustness.md`: the P0.3b PDF test set, cost, memory and startup |
 | `calibrate.py` | Historical tier-threshold calibration (the thresholds were removed) |
 | `migrate.py` | One-off seed of `documents` from `documents/metadata.json` |
 | `documents/` | Seed documents only: the app never reads or writes it at runtime (`backfill_content.py`, `seed_eval_db.py`, `calibrate.py` and the tests read it). `metadata.json` covers only the first three |
@@ -85,9 +106,13 @@ alembic upgrade 0001:head --sql                # print the migrations' SQL; conn
 alembic check                                  # do the models and the database match?
 python print_schema.py                         # read-only schema print; diff it with migrations/baseline_schema.txt
 python backfill_content.py --dry-run           # what would be filled from documents/; then run it without --dry-run
-python -m evals.seed_eval_db                   # eval database to its fixed state (EVAL_DATABASE_URL in .env)
+python backfill_vectors.py --dry-run           # chunks that would get vectors; then run it without --dry-run
+python -m evals.seed_eval_db                   # eval database to its fixed state, with vectors (EVAL_DATABASE_URL in .env)
 python -m evals.run_eval --label <name>        # eval v2; writes evals/results/<date>-<name>.json
+MAX_UPLOAD_CHUNKS=2000 python -m evals.pdf_robustness   # the PDF test set (--extract-only: no model, no database)
 ```
+
+`MAX_UPLOAD_CHUNKS` (optional, `.env` or the shell) sets the upload chunk limit; 300 when unset.
 
 - Frontend `.env.local` holds `NEXT_PUBLIC_API_URL`. For local work Raj sets it to `http://127.0.0.1:8000` and restarts `npm run dev` (Next.js reads env files only at start), and sets it back to the Render URL afterwards. Vercel uses its own setting, not this file.
 - If Next.js starts on port 3001, an old dev server still holds 3000, and CORS only allows `http://localhost:3000`. `lsof -i :3000` finds it.
@@ -130,12 +155,13 @@ python -m evals.run_eval --label <name>        # eval v2; writes evals/results/<
 
 - Schema changes go through **Alembic** (from P0.2). Never use `create_all` to change an existing table. New revision: `alembic revision -m "<what>" --rev-id 000N`, written by hand, then `alembic check` against a database at head.
 - Migrations are **additive** (new nullable columns or new tables, with defaults), so the code already deployed keeps working between "migrate Neon" and "deploy". `downgrade()` raises: a rollback is a redeploy of the old code, never a schema downgrade.
-- State on 20 Nov: local `compliance` and `compliance_eval` are at `0003` with their content filled. Neon is not yet stamped. At Ship 1, before any deploy, Raj does the following, each with the `DATABASE_URL='<Neon URL>'` prefix:
+- State on 22 Nov: local `compliance` and `compliance_eval` are at `0004` with their content and vectors filled (26 chunks each). Neon is not yet stamped. At Ship 1, before any deploy, Raj does the following, each with the `DATABASE_URL='<Neon URL>'` prefix:
   1. Compares `python print_schema.py` with `migrations/baseline_schema.txt`. Any difference other than a server default on `retired` → stop.
-  2. Runs `alembic stamp 0001`, `alembic upgrade head` and `alembic check`.
+  2. Runs `alembic stamp 0001`, `alembic upgrade head` (0002, 0003, 0004) and `alembic check`.
   3. Runs `python backfill_content.py --dry-run`, then `python backfill_content.py --retire-unfillable`.
+  4. Runs `python backfill_vectors.py --dry-run`, then `python backfill_vectors.py` (from his Mac, with the pinned chromadb).
 
-  Only then does the frontend deploy, then the backend. A backend that starts against a database without content indexes nothing.
+  Only then does the frontend deploy, then the backend. A backend that starts against a database without content indexes nothing; one without stored vectors re-embeds every document at each start (slow, with a "re-embedding" warning per document), and its uploads fail until `0004` is applied. After the deploy: time one upload on Render (the chunk limit's default of 300 assumes about 2 s per chunk, untimed) and watch Render's memory graph during it.
 - `audit_log` has two time columns: `timestamp` (old, no zone, the writing machine's clock: IST from the Mac, UTC on Render) and `created_at` (UTC, from P0.2).
 - Raj runs migrations and backfills against Neon himself, by hand, during a ship checkpoint. Never do it for him.
 - Tests use a disposable local database; the test setup refuses any URL containing `neon.tech`.

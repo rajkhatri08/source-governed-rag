@@ -1,0 +1,250 @@
+{
+ "run_date": "2026-11-21",
+ "max_chunks": 300,
+ "pdfs": [
+  {
+   "file": "protected_policy.pdf",
+   "bytes": 2515,
+   "sha256": "46f79522b0eb87e256d4d25fb1cdb6ea78b943159ac070f64a08d2671cf1e0a6",
+   "accepted": false,
+   "status": 422,
+   "message": "this PDF is password-protected: remove the password and upload it again"
+  },
+  {
+   "file": "scanned_policy.pdf",
+   "bytes": 102719,
+   "sha256": "0345132e39951de871fc3120e94909e16d731c76d2ceac7b54433f7c9faa3976",
+   "accepted": false,
+   "status": 422,
+   "message": "no extractable text: this PDF has no text layer (is it a scan?)"
+  },
+  {
+   "file": "apple_privacy_policy.pdf",
+   "bytes": 245399,
+   "sha256": "f3171fac1aac419344d9d3c3a958a18b8130aa92d8abd0290464985966cb8f59",
+   "extract_seconds": 0.31,
+   "extract_cpu_seconds": 0.3,
+   "accepted": true,
+   "pages": 1,
+   "characters": 29697,
+   "chunks": 38,
+   "chunks_before_p03b": 38,
+   "chunks_with_only_furniture_removal": 38,
+   "furniture": [],
+   "page_breaks": 0,
+   "page_breaks_joined": 0,
+   "embed_seconds": 2.29,
+   "embed_cpu_seconds": 8.64,
+   "index_seconds": 0.12,
+   "questions": [
+    {
+     "id": "pdf-apple-1",
+     "question": "Below what age does Apple treat a person as a child?",
+     "expected_facts": [
+      [
+       "13"
+      ]
+     ],
+     "where": "Children and Minors",
+     "answer": "Under the age of 13 (or the equivalent age as specified by law in your jurisdiction).",
+     "refused": false,
+     "missing_facts": [],
+     "correct": true,
+     "now": {
+      "top_distance": 0.987,
+      "passing_chunks": 1,
+      "facts_retrieved": true
+     },
+     "before_p03b": {
+      "top_distance": 0.987,
+      "passing_chunks": 1,
+      "facts_retrieved": true
+     }
+    },
+    {
+     "id": "pdf-apple-2",
+     "question": "Which Apple company controls the personal data of people in the European Economic Area?",
+     "expected_facts": [
+      [
+       "Apple Distribution International"
+      ]
+     ],
+     "where": "Apple Companies Around the World",
+     "answer": "Based on the provided context, the personal data of people in the European Economic Area is controlled by **Apple Distribution International Limited in Ireland**.",
+     "refused": false,
+     "missing_facts": [],
+     "correct": true,
+     "now": {
+      "top_distance": 0.461,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     },
+     "before_p03b": {
+      "top_distance": 0.461,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     }
+    }
+   ]
+  },
+  {
+   "file": "bert_two_column.pdf",
+   "bytes": 775166,
+   "sha256": "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e",
+   "extract_seconds": 0.57,
+   "extract_cpu_seconds": 0.63,
+   "accepted": true,
+   "pages": 16,
+   "characters": 64227,
+   "chunks": 74,
+   "chunks_before_p03b": 74,
+   "chunks_with_only_furniture_removal": 74,
+   "furniture": [],
+   "page_breaks": 15,
+   "page_breaks_joined": 5,
+   "embed_seconds": 3.73,
+   "embed_cpu_seconds": 14.71,
+   "index_seconds": 0.07,
+   "questions": [
+    {
+     "id": "pdf-bert-1",
+     "question": "How many layers and how many parameters does BERT-LARGE have?",
+     "expected_facts": [
+      [
+       "24"
+      ],
+      [
+       "340"
+      ]
+     ],
+     "where": "Section 3, model architecture: two-column body",
+     "answer": "Based on the provided context, BERT-LARGE has **24 layers** (denoted as L=24) and **340M parameters** (340 million total parameters).",
+     "refused": false,
+     "missing_facts": [],
+     "correct": true,
+     "now": {
+      "top_distance": 0.653,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     },
+     "before_p03b": {
+      "top_distance": 0.653,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     }
+    },
+    {
+     "id": "pdf-bert-2",
+     "question": "When BERT's masking procedure picks a word, how often is it replaced with the [MASK] token?",
+     "expected_facts": [
+      [
+       "80%",
+       "80 %",
+       "80 percent"
+      ]
+     ],
+     "where": "Appendix A.1, the masking procedure: two-column body",
+     "answer": "Based on the provided context, when a word is chosen during the masking procedure, it is replaced with the [MASK] token **80% of the time**.",
+     "refused": false,
+     "missing_facts": [],
+     "correct": true,
+     "now": {
+      "top_distance": 0.612,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     },
+     "before_p03b": {
+      "top_distance": 0.612,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     }
+    }
+   ]
+  },
+  {
+   "file": "nist_ai_rmf_1.0.pdf",
+   "bytes": 1946127,
+   "sha256": "7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1",
+   "extract_seconds": 0.59,
+   "extract_cpu_seconds": 0.65,
+   "accepted": true,
+   "pages": 48,
+   "characters": 105086,
+   "chunks": 129,
+   "chunks_before_p03b": 131,
+   "chunks_with_only_furniture_removal": 129,
+   "furniture": [
+    "NIST AI #-# AI RMF #.#",
+    "Page #"
+   ],
+   "page_breaks": 47,
+   "page_breaks_joined": 6,
+   "embed_seconds": 6.73,
+   "embed_cpu_seconds": 26.69,
+   "index_seconds": 0.11,
+   "questions": [
+    {
+     "id": "pdf-rmf-1",
+     "question": "What are the four functions of the AI RMF Core?",
+     "expected_facts": [
+      [
+       "govern"
+      ],
+      [
+       "map"
+      ],
+      [
+       "measure"
+      ],
+      [
+       "manage"
+      ]
+     ],
+     "where": "Part 2, the Core: prose",
+     "answer": "Based on the provided context, the four functions of the AI RMF Core are:\n\n1. **GOVERN**\n2. **MAP**\n3. **MEASURE**\n4. **MANAGE**",
+     "refused": false,
+     "missing_facts": [],
+     "correct": true,
+     "now": {
+      "top_distance": 0.497,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     },
+     "before_p03b": {
+      "top_distance": 0.472,
+      "passing_chunks": 5,
+      "facts_retrieved": true
+     }
+    },
+    {
+     "id": "pdf-rmf-2",
+     "question": "Who should take responsibility for decisions about the risks of developing and deploying AI systems?",
+     "expected_facts": [
+      [
+       "executive leadership"
+      ]
+     ],
+     "where": "Part 2, Table 1, GOVERN 2.3: a table row",
+     "answer": "Based on the provided context, I don't know. The text discusses responsible practices, decisions about AI system design, and prompting organizations and internal teams to think critically about risks, but it does not explicitly state who should take responsibility for those decisions.",
+     "refused": true,
+     "missing_facts": [
+      [
+       "executive leadership"
+      ]
+     ],
+     "correct": false,
+     "now": {
+      "top_distance": 0.581,
+      "passing_chunks": 5,
+      "facts_retrieved": false
+     },
+     "before_p03b": {
+      "top_distance": 0.627,
+      "passing_chunks": 5,
+      "facts_retrieved": false
+     }
+    }
+   ]
+  }
+ ]
+}

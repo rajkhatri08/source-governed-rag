@@ -444,3 +444,92 @@ Commit: the one that adds this entry.
   - `/documents` sends no content
 - **Local databases.** The dev and eval databases are at 0003, with `alembic check` clean. The backfill filled 3 rows on the dev database and reported `h0_missing_file_test.txt` (retired, no file); a second run changed nothing.
 - **Retrieval unchanged.** With the text read from Postgres, all 48 eval questions' top 5 match the P0.5 results, and the 26 chunk ids are byte-identical to P0.2's. `calibrate.py` printed the same result. No model calls.
+
+## 22 Nov 2026 · P0.3b: real-world PDFs, and vectors stored in Postgres
+
+Commit: the one that adds this entry. Measurements: [docs/eval/pdf_robustness.md](eval/pdf_robustness.md).
+
+**Context.**
+- **Senior management will upload their own PDFs**, and the upload path failed them in several ways:
+  - A password-protected PDF was refused as "can't be read as a PDF".
+  - pypdf errors outside `PyPdfError` (a `KeyError` on a damaged file, `DependencyError` on unsupported encryption) became 500s.
+  - Nothing limited pages or chunks.
+  - Headers, footers and page numbers went into the chunks.
+  - The form showed nothing while it worked.
+- **Every cold start re-embedded every stored chunk.** Render's free instance has a tenth of a CPU and sleeps after 15 idle minutes, so one long upload would have slowed every wake-up.
+- **A test set of seven PDFs found six more problems:**
+  - page breaks splitting sentences
+  - words hyphenated at line ends
+  - a footer the furniture rule missed
+  - the chunker turning a 144-page regulation into one chunk
+  - the embedding model reloaded on every call
+  - batch memory that let an upload and a question together exceed 512 MB
+
+**Decision.**
+- **Upload checks** (`upload.py`), each a plain message:
+  - A password-protected PDF → 422. A PDF locked only against printing or copying opens, because pypdf tries the empty password.
+  - More than 300 pages → 413, before any text is extracted.
+  - Any other pypdf failure → 422, logged with its traceback. The broad `except` wraps the pypdf calls only, and our own refusals pass through it unchanged.
+  - More chunks than `MAX_UPLOAD_CHUNKS` → 413. It is 300 when unset, and a value that isn't a positive whole number stops the app at startup.
+- **Extraction:**
+  - **Page furniture is dropped.** A line in a page's first or last two lines is furniture if, with its digits replaced by `#`, it is on at least half of all pages, or of the odd pages, or of the even ones, and on at least two pages, in a PDF of three or more pages.
+  - **Pages are joined by one line break,** so a sentence that runs onto the next page joins up as it would across lines.
+  - **A word hyphenated at a line end is rejoined.**
+- **The chunker** (`ingest.py`):
+  - The lines before the first heading prefix every piece only if they are a title, at most 300 characters.
+  - No chunk is longer than 1,500 characters: a longer piece is packed line by line.
+- **Stored vectors** (migration `0004`, table `document_chunks`): each chunk's id, text, hash, vector (`REAL[]`) and model name.
+  - **An upload is prepare → name check → embed → one transaction (the document and its chunks) → add to the index with those vectors.** The name check (`db.document_exists`) refuses a taken name with 409 before minutes of embedding; the unique constraint still decides, so a duplicate that slips past the check (two simultaneous uploads of one name) gets the same 409 from the insert.
+  - **Startup** chunks each document's stored text and uses its stored vectors only if every chunk has one, from the same text and the same model. Otherwise it embeds the document again and logs a warning naming it; a failure reading the vectors also falls back to embedding.
+  - **The backfill.** `backfill_vectors.py` stores the vectors of existing documents. `seed_eval_db.py` stores the eval database's vectors too.
+- **One embedding model** (`retrieve.EMBEDDER`), loaded at startup, serves startup, uploads and questions.
+  - The index's L2 distance is pinned, because Chroma would otherwise pick cosine for this model.
+  - Chunks are embedded one per model call.
+- **One upload at a time:** another one arriving meanwhile gets 503 "another upload is being indexed; please try again in a minute".
+- **The upload form:**
+  - It shows an uploading state and the success message.
+  - It shows every API error as written, and explains a non-JSON reply or a lost connection.
+  - It checks size and type in the browser.
+  - It shows the data notice, is readable in dark mode, and the page title is "Source-Governed RAG".
+
+**Alternatives considered.**
+- **pgvector.** It would search in Postgres, but it needs an extension; Chroma still does the search here, so a float array is enough.
+- **Stored chunks as the source of truth,** read at startup without re-chunking. A chunker change would then leave old chunks in place. Treating the vectors as a cache keyed by chunk id and model keeps `documents.content` the one source of truth.
+- **Storing the row before embedding,** as P0.3 did. A duplicate would then be refused before minutes of embedding. But an upload that runs out of memory mid-embedding would leave a committed row that the next start embeds again, possibly crashing in a loop. Embedding first leaves nothing behind, and the name check before it refuses most duplicates just as early.
+- **The name check alone, without relying on the constraint** (check-then-insert, as P0.3 rejected). Two simultaneous uploads of one name could both pass it. The check only saves time; the constraint keeps the guarantee.
+- **Lowering the furniture threshold** below half, to catch the alternating footer. It would raise the risk of dropping body lines. Counting odd and even pages separately follows how printed documents are laid out.
+- **A fixed chunk limit of 300, or keeping 2,000.** Render's speed is unknown until it is timed. A setting with a safe default lets it be tuned without a code change.
+- **Lowering the chunk limit to cut memory.** Measured: the peak didn't depend on document size; the batch size set it.
+- **Batches of 4, 8, 16 or 32 texts.** One text per call used the least memory and the least CPU, with bit-identical vectors.
+- **Binding the port first and indexing in the background.** Not needed while a start from stored vectors takes seconds.
+
+**Consequences and limitations.**
+- **Render's speed is estimated, not measured:** about 2 s per chunk, so a 300-chunk upload takes about 10 minutes. The first upload at Ship 1 should be timed, and Render's memory graph watched.
+- **The memory figures are macOS's,** which run larger than Linux's.
+- **A duplicate is refused after the file has been checked and its text extracted,** because the name has to pass the name rules first. For a long PDF on Render that is seconds of parsing, not minutes of embedding.
+- **Vectors are stored only for documents that aren't retired.** Reinstating one (P1.1) must store its vectors if they're missing.
+- **There is no limit on the total corpus,** and the index grows with every upload.
+- **Tables are flattened into lines,** so a table row shares its chunk with its neighbours.
+- **The extraction rules are heuristics.** A compound broken at its own hyphen loses the hyphen. A margin stamp can be glued to the next page's first line. A furniture line pypdf places mid-page stays.
+- **The vectors on Neon will come from Raj's Mac** (`backfill_vectors.py`), while questions are embedded on Render. Vectors are bit-identical across batch sizes on one machine; across CPUs the last digits may differ, which matters only for a chunk exactly at the 1.2 cutoff.
+
+**How it was verified.**
+- **53 new unit tests, 156 in all**, none touching a database or the model:
+  - every new rejection, through the checks and through `/upload`
+  - the furniture rule, including alternating headers and "Article N" headings kept
+  - page joins and rejoined words
+  - the chunker cap and the title limit
+  - the chunk-limit setting
+  - the upload order, the name check before embedding, the 503, and the embedding-failure path
+  - stored vectors used, or not, at startup
+  - the batching
+- **Retrieval unchanged.** After every change, all 48 eval questions' top 5 are bit-identical between stored and re-embedded vectors and against the P0.5 run, with the same 26 chunk ids.
+- **On a scratch database built from 0001 to 0004:**
+  - an insert with its chunk rows; a duplicate; the cascade on delete; the vectors read back
+  - the real server end to end: an upload, then a restart without re-embedding
+- **The local databases.** Dev and eval are at 0004 with `alembic check` clean. The backfill stored 26 vectors; a second run stored none.
+- **The PDF test set:**
+  - every PDF ended in a clear outcome
+  - 10 of 10 questions answered correctly (5 of 6 before words were rejoined)
+  - peak memory for a 300-chunk upload with a question during it: 280 MB (1,066 MB before)
+  - a start from 736 stored vectors in 0.6 s, against 53.1 s re-embedding

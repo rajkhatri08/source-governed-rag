@@ -59,20 +59,21 @@ A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of 
 
 | File | Responsibility |
 |---|---|
-| `ingest.py` | Clean and chunk text |
-| `upload.py` | Every check on an upload, before anything is stored; text extraction from .txt and .pdf |
-| `retrieve.py` | Build the vector index, search, add to a live index; content-derived chunk ids |
+| `ingest.py` | Clean and chunk text; rejoin hyphenated words |
+| `upload.py` | Every check on an upload, before anything is stored; text extraction from .txt and .pdf, dropping page furniture |
+| `retrieve.py` | The one embedding model; build the vector index, embed, search, add to a live index; content-derived chunk ids |
 | `generate.py` | Prompt construction and the model call |
 | `govern.py` | Expiry check and tier classification |
 | `db.py` | SQLAlchemy models, audit log, document metadata |
 | `api.py` | FastAPI endpoints |
 | `pipeline.py` | The question-answering pipeline, shared by the API and the evaluation |
-| `evals/` | Evaluation v2: 48 pre-registered questions, the harness and its scoring |
+| `evals/` | Evaluation v2: 48 pre-registered questions, the harness and its scoring; the PDF test set and its measurement |
 | `calibrate.py` | Threshold calibration against the labelled set |
 | `migrations/`, `alembic.ini` | Alembic schema migrations; `migrations/baseline_schema.txt` is the schema revision 0001 creates |
 | `print_schema.py` | Read-only schema print, to compare a database with the baseline before stamping it |
 | `migrate.py` | One-off load of document metadata into Postgres |
 | `backfill_content.py` | Fills the stored text of documents created before it was kept, from the seed files in `documents/` |
+| `backfill_vectors.py` | Stores the vectors of existing documents' chunks, so startup doesn't embed them again |
 
 ---
 
@@ -121,11 +122,17 @@ The concrete case: the question *"how quickly must AI-related data requests be a
 
 ## Document upload
 
-Documents can be uploaded at runtime through the dashboard or the API, as plain text or PDF. An uploaded document's text is stored in Postgres, then chunked and added to the live ChromaDB collection, so it is searchable immediately and still there after a restart: at startup the index is rebuilt from the text in Postgres. Nothing is written to disk; `documents/` holds only the seed documents.
+Documents can be uploaded at runtime through the dashboard or the API, as plain text or PDF. An uploaded document's text, and its chunks with their vectors, are stored in Postgres, then added to the live ChromaDB collection, so it is searchable immediately and still there after a restart. At startup the index is rebuilt from the vectors stored in Postgres, so a cold start doesn't run the embedding model over every chunk again. Nothing is written to disk; `documents/` holds only the seed documents.
 
 **Uploaded documents default to unapproved.** This is the governance premise applied to ingestion: a new document is retrievable but cannot produce a GOLD answer until someone explicitly approves it. Answers drawn from it are returned with a named warning and a BRONZE tier.
 
-PDF text is extracted with `pypdf` and passed through a PDF-specific cleaning stage before the general one. That stage normalises ligatures (`ﬁ` → `fi`, `ﬂ` → `fl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
+PDF text is extracted with `pypdf` and cleaned in stages:
+- **Page furniture is dropped.** A line at the top or bottom of a page is a header, footer or page number if, with its digits ignored, it repeats there on at least half of all pages, or of the odd or the even pages: printed documents often alternate them.
+- **Pages are joined so that a sentence continuing onto the next page joins up.**
+- **A word hyphenated at a line end is rejoined.**
+- **The PDF-specific stage** normalises ligatures (`ﬁ` → `fi`, `ﬂ` → `fl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
+
+[docs/eval/pdf_robustness.md](docs/eval/pdf_robustness.md) measures each stage on seven real PDFs.
 
 **Every check runs before anything is stored** (`upload.py`), cheapest first. A failed upload therefore leaves nothing behind.
 - **The name** must be a plain file name:
@@ -135,10 +142,11 @@ PDF text is extracted with `pypdf` and passed through a PDF-specific cleaning st
 
   It is normalised to NFC, so an accented letter is stored one way, however the browser sent it.
 - **The owner, version and review date** must fit their columns, and the date must be a real `YYYY-MM-DD`.
-- **The file** must be at most 10 MB.
-- **There must be text to extract.** A PDF with no text layer, a PDF that can't be read, or a .txt that isn't UTF-8 is refused with a message saying which.
+- **The file** must be at most 10 MB, and a PDF at most 300 pages (counted before any text is extracted).
+- **There must be text to extract.** A PDF with no text layer (a scan), a password-protected PDF, a PDF that can't be read, or a .txt that isn't UTF-8 is refused with a message saying which.
+- **The text must fit the chunk limit:** 300 chunks (about 300,000 characters) unless `MAX_UPLOAD_CHUNKS` says otherwise. Embedding is the slow part of an upload, and the free server has a tenth of a CPU.
 
-Only then is the row inserted, with its text, in one transaction. A duplicate name is refused by Postgres's unique constraint itself, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved.
+A name that is already taken is refused next, before minutes of embedding are spent on it. Only then are the chunks embedded, and only then are the row, its text and its chunks' vectors inserted, in one transaction. That early name check doesn't decide: Postgres's unique constraint does, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved. One upload is processed at a time; another arriving meanwhile is asked to try again in a minute.
 
 ---
 
@@ -207,7 +215,10 @@ Create the tables with the migrations, load document metadata, then store each s
 alembic upgrade head
 python migrate.py
 python backfill_content.py
+python backfill_vectors.py
 ```
+
+`backfill_vectors.py` stores each chunk's vector, so the API starts without re-embedding; without it, startup still works, embedding the documents again. `MAX_UPLOAD_CHUNKS` in `.env` raises the upload chunk limit (300 by default), for example to try a long regulation locally.
 
 Every schema change is an Alembic migration in `migrations/versions/`. `alembic upgrade head` applies the ones a database hasn't had yet; `alembic upgrade 0001:head --sql` prints their SQL without connecting. A `DATABASE_URL` set in the shell takes precedence over `.env`. The migrations only add columns or tables, so the code already deployed keeps working while a database is migrated ahead of a deploy.
 
@@ -230,7 +241,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | GET | `/health` | Always HTTP 200: `status` (`ok` or `degraded`), whether the database answers, documents and chunks indexed, and the documents that failed to index at startup, each with a reason |
 | POST | `/query` | Ask a question; returns answer, tier, reason, warnings, sources |
 | GET | `/documents` | Document inventory with computed expiry status |
-| POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB); stored in Postgres, indexed immediately, unapproved by default |
+| POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB, 300 pages and 300 chunks); stored in Postgres with its vectors, indexed immediately, unapproved by default |
 | POST | `/documents/{filename}/approve` | Approve a document |
 | POST | `/documents/{filename}/unapprove` | Revoke approval |
 | POST | `/documents/{filename}/retire` | Retire a document: removed from the index, kept in the audit trail |
@@ -240,10 +251,10 @@ Errors, each with a plain message in `detail`:
 - `400` on an empty question, or an upload's name, owner, version or review date
 - `404` on an unknown document
 - `409` on a duplicate filename
-- `413` on an upload over 10 MB
-- `422` on an upload with no extractable text, an unreadable PDF or a .txt that isn't UTF-8
+- `413` on an upload over 10 MB, a PDF over 300 pages, or a text over the chunk limit
+- `422` on an upload with no extractable text, a password-protected or unreadable PDF, or a .txt that isn't UTF-8
 - `500` if indexing an upload fails (nothing is saved)
-- `503` when the model is unavailable
+- `503` when the model is unavailable, or while another upload is being indexed
 
 ---
 
@@ -257,17 +268,21 @@ These are real and worth stating plainly.
 
 **Only the extracted text is kept, not the uploaded file.** The original PDF is never stored. An improvement to PDF cleaning can't be applied to documents uploaded before it, because their raw text is gone. The seed documents can be re-extracted from `documents/`.
 
-**The index is rebuilt from scratch on every start.** The vector index lives in memory, so each cold start re-embeds every stored document's chunks. That is fine for a few dozen chunks, slow for tens of thousands. A persistent vector store (for example pgvector) is the scale fix.
+**The index is rebuilt in memory on every start, and nothing limits its total size.** Each start reads every chunk's stored vector from Postgres and adds it to an in-memory ChromaDB collection: 0.6 seconds for 736 chunks, where embedding them again took 53 seconds. But the collection lives in the server's 512 MB, and each upload adds to it. A persistent vector store (for example pgvector) is the scale fix.
+
+**Uploads are slow on the free server.** Embedding takes about 0.2 CPU-seconds per chunk on a laptop. On Render's tenth of a CPU that is probably about 2 seconds per chunk, so a document at the 300-chunk limit may take around 10 minutes. This is estimated, not yet timed on Render.
+
+**Tables come through as lines.** pypdf reads a table row by row, and rows are packed into chunks with their neighbours, so a question answered by one row competes with prose on the same topic.
 
 **The 10 MB limit is checked after the upload has arrived.** The web framework receives the whole request, buffering anything over 1 MB in a temporary file, before the endpoint can measure it. An oversized upload is refused with a clear message, but only once it has been sent in full.
 
-**PDF cleaning is heuristic.** The line-joining regex uses punctuation and capitalisation to guess where a sentence continues across a line break. It works on the documents tested, but it is a guess, not a rule, and it will misjudge some layouts.
+**PDF cleaning is heuristic.** The line-joining regex uses punctuation and capitalisation to guess where a sentence continues across a line or page break. The furniture rule recognises a header or footer by its repetition at the page edges. The hyphen rule rejoins a word split at a line end, so a compound broken at its own hyphen ("pre-train") loses the hyphen. They work on the documents tested, but they are guesses, not rules, and they will misjudge some layouts. A scanned PDF is refused, not read: there is no OCR.
 
 **The 1.2 relevance cutoff was chosen by inspection**, not calibration. Unlike the tier thresholds, it has not been measured, and it is a known weak point. Short, casually phrased questions produce weaker embedding matches than formally worded ones and can fall outside it even when the corpus does answer them.
 
 **The evaluation set is 48 questions**, all written and labelled by one person. An answer's facts are checked by substring, which can pass a wrong answer that contains the phrase ("not 72 hours") and miss a correct one worded differently. Large enough to compare configurations against each other on the same questions; too small to claim an absolute accuracy figure with confidence.
 
-**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check, and the `/upload` and `/health` endpoints. Nothing yet checks the tier rules in `govern.py`, such as how `is_expired` handles a malformed date, or the other endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
+**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check and PDF-cleaning rule, the use of stored vectors at startup, and the `/upload` and `/health` endpoints. Nothing yet checks the tier rules in `govern.py`, such as how `is_expired` handles a malformed date, or the other endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
 
 **Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 

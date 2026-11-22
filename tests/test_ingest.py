@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ingest import chunk_document, chunk_text, clean_text, load_document
+from ingest import MAX_CHUNK_CHARS, chunk_document, chunk_text, clean_text, join_broken_words, load_document
 
 DOCUMENTS = Path(__file__).parent.parent / "documents"
 FILLER = " ".join(["The controller shall keep a record of this."] * 20)  # 899 characters
@@ -101,3 +101,45 @@ def test_each_seed_policy_is_chunked_by_section_under_its_title(name, title, cou
     for number, chunk in enumerate(chunks, start=1):
         assert chunk.startswith(f"{title} | Section {number}.")
         assert "GDPR" not in chunk  # no internal policy poses as a GDPR article
+
+
+@pytest.mark.parametrize("text, joined", [
+    ("a recommenda-\ntion", "a recommendation"),
+    ("Rad-\nford et al.", "Radford et al."),
+    ("Re-\nsponsibility", "Responsibility"),
+])
+def test_a_word_hyphenated_at_a_line_end_is_rejoined(text, joined):
+    assert join_broken_words(text) == joined
+
+
+@pytest.mark.parametrize("text", [
+    "AI-\nbased systems",  # a capital before the hyphen: a compound such as "AI-based"
+    "the Pre-\nTrial stage",  # a capital after it
+    "from 2019-\n2020",  # digits
+    "costs -\nwhich rise",  # a dash after a space
+    "well-known terms",  # a hyphen that isn't at a line end
+])
+def test_other_hyphens_at_line_ends_are_left_alone(text):
+    assert join_broken_words(text) == text
+
+
+def long_text(lines: int) -> str:
+    """Lines of ordinary sentences with no heading: about 90 characters each."""
+    return "\n".join(f"Line {n} of a long regulation sets out a rule that providers must follow." for n in range(lines))
+
+
+def test_a_section_reference_that_starts_a_line_doesnt_make_the_document_one_chunk():
+    # A long text whose only "Section N." line is a cross-reference that happened to wrap to a line start
+    text = long_text(60) + "\nSection 2. of Annex V sets out the declaration.\n" + long_text(40)
+    chunks = chunk_document(text)
+    assert len(chunks) > 5
+    assert max(len(chunk) for chunk in chunks) <= MAX_CHUNK_CHARS
+    assert not any(chunk.startswith("Line 0") and "Section 2." in chunk for chunk in chunks)  # no giant title prefix
+
+
+def test_a_section_longer_than_the_cap_is_packed_line_by_line():
+    text = "Retention Policy\nSection 1. Scope\n" + long_text(40) + "\nSection 2. Review\nReviewed yearly."
+    chunks = chunk_document(text)
+    assert max(len(chunk) for chunk in chunks) <= MAX_CHUNK_CHARS
+    assert chunks[0].startswith("Retention Policy | Section 1. Scope")
+    assert chunks[-1] == "Retention Policy | Section 2. Review\nReviewed yearly."

@@ -1,9 +1,10 @@
-"""Set the eval database to its fixed state: the three documents in metadata.json, with their text.
+"""Set the eval database to its fixed state: the three documents in metadata.json, with their text and vectors.
 
 Run from the repo root: python -m evals.seed_eval_db
 Safe to run again: it inserts or updates those three rows and never deletes anything. Each row's
 content is extracted from its file in documents/ exactly as an upload's would be, so the eval
-indexes the same text as the app.
+indexes the same text as the app. Its chunks' vectors are stored as backfill_vectors.py stores
+them, so the eval builds its index the way production starts: from stored vectors.
 The tables come from the migrations, not from this script: run `alembic -x db=eval upgrade head` first.
 """
 from pathlib import Path
@@ -13,6 +14,7 @@ from evals.eval_db import use_eval_database
 EVAL_HOST = use_eval_database()  # first: db.py reads DATABASE_URL when it is imported
 
 import db  # noqa: E402
+from backfill_vectors import store_missing_vectors  # noqa: E402
 from retrieve import content_hash  # noqa: E402
 from upload import extract_text  # noqa: E402
 
@@ -50,6 +52,7 @@ def main() -> None:
             row.review_date = fixed["review_date"]
             row.content = extract_text(fixed["filename"], (DOCUMENTS / fixed["filename"]).read_bytes())
             row.content_sha256 = content_hash(row.content)
+        store_missing_vectors(session)
         session.commit()
     finally:
         session.close()

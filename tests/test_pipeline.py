@@ -1,9 +1,10 @@
 from datetime import date
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 import pipeline
-from retrieve import content_hash, make_chunk_id
+from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id
 
 TODAY = date(2026, 11, 18)
 GDPR = {"filename": "gdpr_ch3.txt", "owner": "Legal & Compliance", "version": "2016/679",
@@ -62,18 +63,36 @@ class RecordingIndex:
 
     def __init__(self, fail_for: str | None = None):
         self.added = {}
+        self.embeddings = {}
         self.fail_for = fail_for
 
-    def add(self, ids: list[str], documents: list[str], metadatas: list[dict]) -> None:
+    def add(self, ids: list[str], documents: list[str], metadatas: list[dict], embeddings=None) -> None:
         source = metadatas[0]["source"]
         if source == self.fail_for:
             raise RuntimeError("embedding failed")
         self.added[source] = ids
+        self.embeddings[source] = embeddings
 
 
-def stored(filename: str, content: str | None) -> dict:
+FRESH = [9.0]  # what fake_embed gives every chunk: a vector computed now, not read from the database
+
+
+@pytest.fixture(autouse=True)
+def stored_vectors(monkeypatch) -> dict:
+    """Stands in for document_chunks and the embedding model in every test here: no database, no model.
+
+    Keys are (document id, model); values are {chunk_id: (content_hash, vector)}. Empty: nothing stored.
+    """
+    vectors = {}
+    monkeypatch.setattr(pipeline, "read_stored_vectors",
+                        lambda document_id, model: vectors.get((document_id, model), {}))
+    monkeypatch.setattr(pipeline, "embed", lambda texts: [FRESH for _ in texts])
+    return vectors
+
+
+def stored(filename: str, content: str | None, document_id: int = 1) -> dict:
     """A document as read_documents_to_index returns it."""
-    return {**GDPR, "filename": filename, "content": content}
+    return {**GDPR, "id": document_id, "filename": filename, "content": content}
 
 
 def test_startup_with_no_documents_indexes_nothing_and_fails_nothing():
@@ -93,3 +112,54 @@ def test_a_document_that_fails_to_index_is_reported_and_startup_goes_on():
     indexed, failed = pipeline.index_documents(index, [stored("bad.txt", TEXTS[1]), stored("gdpr_ch3.txt", TEXTS[0])])
     assert indexed == ["gdpr_ch3.txt"]
     assert failed == [{"filename": "bad.txt", "reason": "indexing failed"}]
+
+
+def test_a_document_whose_vectors_are_all_stored_is_indexed_with_them(stored_vectors):
+    stored_vectors[(1, EMBEDDING_MODEL)] = {IDS[0]: (content_hash(TEXTS[0]), [0.5, 0.25])}
+    index = RecordingIndex()
+    assert pipeline.index_documents(index, [stored("gdpr_ch3.txt", TEXTS[0])]) == (["gdpr_ch3.txt"], [])
+    assert index.embeddings["gdpr_ch3.txt"] == [[0.5, 0.25]]
+
+
+def test_a_document_without_stored_vectors_is_embedded_again_and_says_so(caplog):
+    index = RecordingIndex()
+    assert pipeline.index_documents(index, [stored("gdpr_ch3.txt", TEXTS[0])]) == (["gdpr_ch3.txt"], [])
+    assert index.embeddings["gdpr_ch3.txt"] == [FRESH]
+    assert "re-embedding gdpr_ch3.txt" in caplog.text
+
+
+@pytest.mark.parametrize("change", ["one chunk missing", "text changed", "another model"])
+def test_vectors_that_dont_match_every_current_chunk_are_not_used(stored_vectors, change):
+    """The document is embedded again, never indexed with a stale or partial set of vectors."""
+    first, second = "Section 1. Scope", "Section 2. Retention"  # the two chunks of the document below
+    ids = [make_chunk_id("policy.txt", 0, first), make_chunk_id("policy.txt", 1, second)]
+    rows = {ids[0]: (content_hash(first), [0.5]), ids[1]: (content_hash(second), [0.25])}
+    model = EMBEDDING_MODEL
+    if change == "one chunk missing":
+        del rows[ids[1]]
+    elif change == "text changed":
+        rows[ids[1]] = ("0" * 64, [0.25])  # the same id, but the full hash of some other text
+    else:
+        model = "an older model"
+    stored_vectors[(1, model)] = rows
+    index = RecordingIndex()
+    pipeline.index_documents(index, [stored("policy.txt", f"{first}\n{second}")])
+    assert index.added["policy.txt"] == ids
+    assert index.embeddings["policy.txt"] == [FRESH, FRESH]  # the whole document embedded again
+
+
+def test_if_the_stored_vectors_cant_be_read_the_document_is_embedded_and_still_indexed(monkeypatch):
+    def unreadable(document_id, model):
+        raise OperationalError("SELECT ...", {}, Exception("connection lost"))
+
+    monkeypatch.setattr(pipeline, "read_stored_vectors", unreadable)
+    index = RecordingIndex()
+    assert pipeline.index_documents(index, [stored("gdpr_ch3.txt", TEXTS[0])]) == (["gdpr_ch3.txt"], [])
+    assert index.embeddings["gdpr_ch3.txt"] == [FRESH]
+
+
+def test_the_stored_rows_carry_the_same_ids_as_the_index():
+    rows = pipeline.chunk_rows("gdpr_ch3.txt", TEXTS, [[0.5], [0.25]])
+    assert [row["chunk_id"] for row in rows] == IDS
+    assert rows[1] == {"chunk_id": IDS[1], "chunk_index": 1, "content_hash": content_hash(TEXTS[1]),
+                       "chunk_text": TEXTS[1], "embedding": [0.25], "embedding_model": EMBEDDING_MODEL}

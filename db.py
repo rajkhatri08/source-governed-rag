@@ -1,7 +1,9 @@
 import os
 import json
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, text
+from sqlalchemy import (create_engine, Column, ForeignKey, Integer, String, Float, DateTime, Text, Boolean, REAL,
+                        UniqueConstraint, text)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone
@@ -48,6 +50,28 @@ class Document(Base):
     content = Column(Text)  # from P0.3: the extracted, cleaned text that is chunked and indexed
     content_sha256 = Column(String(64))  # from P0.3
     created_at = Column(DateTime(timezone=True))  # from P0.3: when the upload was stored, UTC; null for older rows
+
+
+class DocumentChunk(Base):
+    """From P0.3b: one chunk of a document with its vector, so startup can rebuild the index without the model.
+
+    A cache, not a second source of truth: startup uses a vector only if it was computed by the current
+    model from exactly the text that chunking documents.content gives today.
+    """
+    __tablename__ = "document_chunks"
+    __table_args__ = (UniqueConstraint("chunk_id", "embedding_model",
+                                       name="document_chunks_chunk_id_embedding_model_key"),)
+
+    id = Column(Integer, primary_key=True)
+    # ON DELETE CASCADE: deleting a document (only delete_document does) deletes its chunks with it
+    document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_id = Column(String(255), nullable=False)  # retrieve.make_chunk_id: {filename}::{index}::{hash[:12]}
+    chunk_index = Column(Integer, nullable=False)
+    content_hash = Column(String(64), nullable=False)  # the SHA-256 of chunk_text
+    chunk_text = Column(Text, nullable=False)
+    embedding = Column(ARRAY(REAL), nullable=False)  # REAL is a 4-byte float: exactly what the model outputs
+    embedding_model = Column(String(100), nullable=False)  # retrieve.EMBEDDING_MODEL
+    created_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class DuplicateDocument(Exception):
@@ -161,20 +185,35 @@ def is_unique_violation(error: IntegrityError, table: str) -> bool:
             and getattr(getattr(original, "diag", None), "table_name", None) == table)
 
 
-def insert_document(*, filename: str, owner: str, version: str, review_date: str,
-                    content: str, content_sha256: str) -> int:
-    """Store a new, unapproved document and its text in one transaction; returns the row's id.
+def document_exists(filename: str) -> bool:
+    """True if a document has this filename, retired or not.
 
+    A quick check before an upload is embedded, so a duplicate is refused in seconds, not after minutes
+    of embedding. It doesn't decide: insert_document's unique constraint does.
+    """
+    session = Session()
+    try:
+        return session.query(Document.id).filter(Document.filename == filename).first() is not None
+    finally:
+        session.close()
+
+
+def insert_document(*, filename: str, owner: str, version: str, review_date: str,
+                    content: str, content_sha256: str, chunks: list[dict]) -> int:
+    """Store a new, unapproved document, its text and its chunks' vectors in one transaction; returns its id.
+
+    `chunks` are document_chunks rows without their document_id (pipeline.chunk_rows builds them).
     There is no check-then-insert: Postgres's unique constraint decides, so two simultaneous
     uploads of one name can't both succeed. A duplicate raises DuplicateDocument.
     """
     session = Session()
     try:
+        now = datetime.now(timezone.utc)
         doc = Document(filename=filename, owner=owner, version=version, approved=False, retired=False,
-                       review_date=review_date, content=content, content_sha256=content_sha256,
-                       created_at=datetime.now(timezone.utc))
+                       review_date=review_date, content=content, content_sha256=content_sha256, created_at=now)
         session.add(doc)
         session.flush()  # sends the INSERT, so a duplicate fails here and the new id is known
+        session.add_all([DocumentChunk(document_id=doc.id, created_at=now, **chunk) for chunk in chunks])
         document_id = doc.id
         session.commit()
         return document_id
@@ -188,7 +227,10 @@ def insert_document(*, filename: str, owner: str, version: str, review_date: str
 
 
 def delete_document(document_id: int) -> None:
-    """Undo insert_document when indexing the upload failed: a failed upload leaves no row behind."""
+    """Undo insert_document when indexing the upload failed: a failed upload leaves no row behind.
+
+    Its document_chunks rows go with it: Postgres deletes them (ON DELETE CASCADE).
+    """
     session = Session()
     try:
         session.query(Document).filter(Document.id == document_id).delete()
@@ -202,8 +244,23 @@ def read_documents_to_index() -> list[dict]:
     session = Session()
     try:
         rows = session.query(Document).filter(Document.retired.isnot(True)).order_by(Document.id).all()
-        return [{"filename": r.filename, "owner": r.owner, "version": r.version, "approved": r.approved,
-                 "review_date": r.review_date, "content": r.content} for r in rows]
+        return [{"id": r.id, "filename": r.filename, "owner": r.owner, "version": r.version,
+                 "approved": r.approved, "review_date": r.review_date, "content": r.content} for r in rows]
+    finally:
+        session.close()
+
+
+def read_stored_vectors(document_id: int, embedding_model: str) -> dict[str, tuple[str, list[float]]]:
+    """One document's stored vectors from one model, by chunk id, each with the hash of the text it came from.
+
+    Read one document at a time, so startup holds only one document's vectors as Python lists at once.
+    """
+    session = Session()
+    try:
+        rows = (session.query(DocumentChunk.chunk_id, DocumentChunk.content_hash, DocumentChunk.embedding)
+                .filter(DocumentChunk.document_id == document_id, DocumentChunk.embedding_model == embedding_model)
+                .all())
+        return {chunk_id: (content_hash, embedding) for chunk_id, content_hash, embedding in rows}
     finally:
         session.close()
 

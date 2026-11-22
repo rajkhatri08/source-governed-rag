@@ -5,8 +5,10 @@ import json
 ARTICLE_HEADING = re.compile(r"^(?=Art\. \d+ GDPR$)", re.MULTILINE)  # a line that is exactly "Art. 12 GDPR"
 SECTION_HEADING = re.compile(r"^(?=Section \d+\.)", re.MULTILINE)  # a line starting "Section 2."
 NUMBERED_PARAGRAPH = re.compile(r"^(?=\d+\. )", re.MULTILINE)  # a line starting "3. " (not "3The": a sentence number)
+BROKEN_WORD = re.compile(r"(?<=[a-z])-\n(?=[a-z])")  # "recommenda-\ntion": a word a PDF hyphenated at a line end
 
-MAX_CHUNK_CHARS = 1500  # a longer article is split at its numbered paragraphs; a longer line is cut
+MAX_CHUNK_CHARS = 1500  # a longer article is split at its numbered paragraphs, any other longer piece is packed
+MAX_TITLE_CHARS = 300  # the lines before the first heading start every piece only if they are this short: a title
 PACK_CHARS = 1000  # with no headings, lines are packed into chunks of up to this size
 OVERLAP_CHARS = 50  # when a line has to be cut, as in the 1000/50 run of August
 
@@ -32,12 +34,18 @@ def chunk_by_article(document: str) -> list[str]:
 
 
 def chunk_document(text: str) -> list[str]:
-    """Split cleaned text where the document's own structure splits: articles, else sections, else lines."""
+    """Split cleaned text where the document's own structure splits: articles, else sections, else lines.
+
+    No chunk is longer than MAX_CHUNK_CHARS: a longer piece is packed line by line. A heading match can
+    be an accident (a cross-reference that happens to start a line), and must not make a giant chunk.
+    """
     if ARTICLE_HEADING.search(text):
-        return chunk_articles(text)
-    if SECTION_HEADING.search(text):
-        return split_with_prefix(text, SECTION_HEADING)
-    return pack_lines(text)
+        pieces = chunk_articles(text)
+    elif SECTION_HEADING.search(text):
+        pieces = split_with_prefix(text, SECTION_HEADING)
+    else:
+        return pack_lines(text)
+    return [chunk for piece in pieces for chunk in (pack_lines(piece) if len(piece) > MAX_CHUNK_CHARS else [piece])]
 
 
 def chunk_articles(text: str) -> list[str]:
@@ -57,11 +65,17 @@ def chunk_articles(text: str) -> list[str]:
 def split_with_prefix(text: str, heading: re.Pattern) -> list[str]:
     """Split before each heading line. The lines before the first heading (a title) start every piece.
 
-    No heading in the text gives an empty list.
+    No heading in the text gives an empty list. Text before the first heading that is longer than a
+    title (MAX_TITLE_CHARS) is content, not a title: it is packed into chunks of its own, and the pieces
+    get no prefix.
     """
     parts = heading.split(text)
     prefix = " | ".join(line for line in parts[0].split("\n") if line)
     pieces = [part.strip() for part in parts[1:]]
+    if not pieces:
+        return []
+    if len(prefix) > MAX_TITLE_CHARS:
+        return pack_lines(parts[0].strip()) + pieces
     if prefix:
         return [f"{prefix} | {piece}" for piece in pieces]
     return pieces
@@ -101,6 +115,16 @@ def clean_text(document):
         if stripped:
             cleaned.append(stripped)
     return "\n".join(cleaned)
+
+
+def join_broken_words(text: str) -> str:
+    """Rejoin the words a PDF hyphenated at a line end: "recommenda-\\ntion" becomes "recommendation".
+
+    Only a lower-case letter, a hyphen, a line break and a lower-case letter: "AI-\\nbased", "2019-\\n2020"
+    and a dash after a space stay as they are. The cost: a compound broken at its own hyphen loses it
+    ("pre-\\ntrain" becomes "pretrain").
+    """
+    return BROKEN_WORD.sub("", text)
 
 
 def clean_pdf_text(document):

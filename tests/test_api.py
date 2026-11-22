@@ -4,10 +4,12 @@ from starlette.datastructures import State
 
 import api
 from db import DuplicateDocument
-from pdf_samples import blank_pdf
-from upload import MAX_UPLOAD_BYTES
+from pdf_samples import blank_pdf, encrypted_pdf, numbered_sections
+from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id
+from upload import MAX_CHUNKS, MAX_PAGES, MAX_UPLOAD_BYTES
 
 FIELDS = {"owner": "Operations", "version": "1.0", "review_date": "2027-01-15"}
+VECTOR = [0.5, 0.25]  # what fake_embed gives every text
 
 
 class FakeIndex:
@@ -15,6 +17,11 @@ class FakeIndex:
 
     def count(self) -> int:
         return 7
+
+
+def fake_embed(texts: list[str]) -> list[list[float]]:
+    """Stands in for the embedding model, which these tests never load."""
+    return [VECTOR for _ in texts]
 
 
 @pytest.fixture
@@ -27,6 +34,8 @@ def app_state(monkeypatch) -> State:
     state = State({"collection": FakeIndex(), "indexed_documents": {"gdpr_ch3.txt"}, "failed_documents": []})
     monkeypatch.setattr(api.app, "state", state)
     monkeypatch.setattr(api, "database_reachable", lambda: True)
+    monkeypatch.setattr(api, "document_exists", lambda filename: False)
+    monkeypatch.setattr(api, "embed", fake_embed)
     return state
 
 
@@ -40,7 +49,7 @@ def upload(client: TestClient, name: str, data: bytes, **fields):
 
 
 def must_not_be_called(*args, **kwargs):
-    raise AssertionError("a rejected upload reached the database or the index")
+    raise AssertionError("an upload got further than it should have")
 
 
 @pytest.mark.parametrize("name, data, fields, status", [
@@ -49,17 +58,28 @@ def must_not_be_called(*args, **kwargs):
     ("a.exe", b"MZ", {}, 400),
     ("policy.txt", b"text", {"review_date": "next year"}, 400),
     ("big.txt", b"a" * (MAX_UPLOAD_BYTES + 1), {}, 413),
+    ("long.pdf", blank_pdf(MAX_PAGES + 1), {}, 413),
+    ("long.txt", numbered_sections(MAX_CHUNKS + 1), {}, 413),
+    ("empty.txt", b"", {}, 422),
     ("scan.pdf", blank_pdf(), {}, 422),
+    ("locked.pdf", encrypted_pdf("secret"), {}, 422),
+    ("fake.pdf", b"%PDF-1.4 this is not really a PDF", {}, 422),
+    ("notes.txt", "café".encode("cp1252"), {}, 422),
 ])
-def test_a_rejected_upload_never_reaches_the_database_or_the_index(client, monkeypatch, name, data, fields, status):
+def test_a_rejected_upload_never_reaches_the_model_the_database_or_the_index(client, monkeypatch, name, data,
+                                                                             fields, status):
+    monkeypatch.setattr(api, "document_exists", must_not_be_called)
+    monkeypatch.setattr(api, "embed", must_not_be_called)
     monkeypatch.setattr(api, "insert_document", must_not_be_called)
     monkeypatch.setattr(api, "index_document", must_not_be_called)
     response = upload(client, name, data, **fields)
     assert response.status_code == status
     assert isinstance(response.json()["detail"], str)
+    assert not api.UPLOAD_LOCK.locked()  # a refusal still lets the next upload in
 
 
-def test_an_accepted_upload_is_stored_with_its_text_then_indexed_unapproved(client, monkeypatch, app_state):
+def test_an_accepted_upload_is_stored_with_its_text_and_vectors_then_indexed_unapproved(client, monkeypatch,
+                                                                                         app_state):
     stored, indexed = [], []
 
     def insert(**row):
@@ -67,16 +87,52 @@ def test_an_accepted_upload_is_stored_with_its_text_then_indexed_unapproved(clie
         return 41
 
     monkeypatch.setattr(api, "insert_document", insert)
-    monkeypatch.setattr(api, "index_document", lambda collection, doc, chunks: indexed.append((doc, chunks)))
-    response = upload(client, "Retention Policy v2.txt", b"Section 1. Scope\nKeep records for 6 years.")
+    monkeypatch.setattr(api, "index_document",
+                        lambda collection, doc, chunks, embeddings: indexed.append((doc, chunks, embeddings)))
+    text = "Section 1. Scope\nKeep records for 6 years."
+    response = upload(client, "Retention Policy v2.txt", text.encode())
     assert response.status_code == 200
     assert response.json() == {"filename": "Retention Policy v2.txt", "chunks": 1, "approved": False}
-    assert stored[0]["content"] == "Section 1. Scope\nKeep records for 6 years."
-    assert indexed[0][0]["approved"] is False
+    assert stored[0]["content"] == text
+    assert stored[0]["chunks"] == [{"chunk_id": make_chunk_id("Retention Policy v2.txt", 0, text), "chunk_index": 0,
+                                    "content_hash": content_hash(text), "chunk_text": text, "embedding": VECTOR,
+                                    "embedding_model": EMBEDDING_MODEL}]
+    doc, chunks, embeddings = indexed[0]
+    assert doc["approved"] is False
+    assert embeddings == [VECTOR]  # indexed with the vectors just stored, not embedded a second time
     assert "Retention Policy v2.txt" in app_state.indexed_documents
 
 
-def test_a_duplicate_name_is_409_and_nothing_is_indexed(client, monkeypatch):
+def test_if_embedding_fails_nothing_is_stored_and_the_upload_reports_500(client, monkeypatch):
+    def broken(texts):
+        raise RuntimeError("model file missing")
+
+    monkeypatch.setattr(api, "embed", broken)
+    monkeypatch.setattr(api, "insert_document", must_not_be_called)
+    response = upload(client, "policy.txt", b"Section 1. Scope")
+    assert response.status_code == 500
+    assert "nothing was saved" in response.json()["detail"]
+
+
+def test_a_second_upload_while_one_is_being_indexed_is_refused_with_503(client, monkeypatch):
+    monkeypatch.setattr(api, "insert_document", must_not_be_called)
+    with api.UPLOAD_LOCK:  # as if another upload were being processed
+        response = upload(client, "policy.txt", b"Section 1. Scope")
+    assert response.status_code == 503
+    assert "another upload" in response.json()["detail"]
+
+
+def test_a_name_that_already_exists_is_409_before_anything_is_embedded(client, monkeypatch):
+    monkeypatch.setattr(api, "document_exists", lambda filename: filename == "gdpr_ch3.txt")
+    monkeypatch.setattr(api, "embed", must_not_be_called)
+    monkeypatch.setattr(api, "insert_document", must_not_be_called)
+    response = upload(client, "gdpr_ch3.txt", b"Art. 1 GDPR")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "a document named gdpr_ch3.txt already exists"
+
+
+def test_a_duplicate_that_passes_the_name_check_is_still_409_from_the_unique_constraint(client, monkeypatch):
+    # Two uploads of one name at the same moment can both pass the check; Postgres refuses the second insert.
     def insert(**row):
         raise DuplicateDocument(row["filename"])
 
@@ -84,14 +140,14 @@ def test_a_duplicate_name_is_409_and_nothing_is_indexed(client, monkeypatch):
     monkeypatch.setattr(api, "index_document", must_not_be_called)
     response = upload(client, "gdpr_ch3.txt", b"Art. 1 GDPR")
     assert response.status_code == 409
-    assert "already exists" in response.json()["detail"]
+    assert response.json()["detail"] == "a document named gdpr_ch3.txt already exists"
 
 
 def test_if_indexing_fails_the_row_is_removed_and_the_upload_reports_500(client, monkeypatch, app_state):
     deleted = []
 
-    def index(collection, doc, chunks):
-        raise RuntimeError("embedding model unavailable")
+    def index(collection, doc, chunks, embeddings):
+        raise RuntimeError("the index refused the chunks")
 
     monkeypatch.setattr(api, "insert_document", lambda **row: 41)
     monkeypatch.setattr(api, "index_document", index)

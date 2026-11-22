@@ -1,26 +1,31 @@
 import logging
 import os
+import threading
 import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from google import genai
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi.datastructures import State
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 
 from govern import is_expired
-from db import (DuplicateDocument, database_reachable, delete_document, insert_document, read_documents,
-                read_documents_to_index, read_log_db, set_approved, set_retired)
-from pipeline import ModelUnavailable, answer_question, index_document, index_documents
-from retrieve import new_index
+from db import (DuplicateDocument, database_reachable, delete_document, document_exists, insert_document,
+                read_documents, read_documents_to_index, read_log_db, set_approved, set_retired)
+from pipeline import ModelUnavailable, answer_question, chunk_rows, index_document, index_documents
+from retrieve import embed, new_index
 from upload import MAX_UPLOAD_BYTES, UploadRejected, prepare_upload
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 STARTUP_RETRY_WAITS = [1, 2, 4, 8]  # seconds between attempts: Neon's free compute takes a moment to wake
+INDEXING_FAILED = "indexing the document failed, so nothing was saved; please try again"
+# One upload at a time: two large PDFs parsed and embedded at once could exhaust a 512 MB server.
+UPLOAD_LOCK = threading.Lock()
 
 
 def read_documents_with_retry() -> list[dict]:
@@ -40,7 +45,13 @@ def read_documents_with_retry() -> list[dict]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Runs once, before the first request is served: index the text stored in Postgres."""
+    """Runs once, before the first request is served: load the embedding model, index the text stored in Postgres."""
+    # The one embedding model every question, upload and re-embedding uses (retrieve.EMBEDDER), loaded now so
+    # that the first question doesn't wait for it: on Render, whose disk is ephemeral, that includes downloading it.
+    try:
+        embed(["warm-up"])
+    except Exception:
+        logger.exception("loading the embedding model failed at startup; the first question will try again")
     app.state.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
     app.state.collection = new_index()
     indexed, failed = index_documents(app.state.collection, read_documents_with_retry())
@@ -107,35 +118,66 @@ def upload(
     version: str = Form(...),
     review_date: str = Form(...)
 ):
-    """Check everything first, then one insert, then index. A failed upload leaves nothing behind.
+    """Check everything, embed, then one insert, then index. A failed upload leaves nothing behind.
 
     A plain `def`, not `async def`: FastAPI runs it in a worker thread, so parsing and embedding a
-    large PDF don't hold up other requests. Nothing is written to disk.
+    large PDF don't hold up other requests. Nothing is written to disk. One upload at a time: another
+    one arriving meanwhile is refused with 503.
     """
-    data = file.file.read(MAX_UPLOAD_BYTES + 1)  # one byte over the limit is enough to know it's too big
+    if not UPLOAD_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=503, detail="another upload is being indexed; please try again in a minute",
+                            headers={"Retry-After": "60"})
     try:
-        prepared = prepare_upload(file.filename, data, owner=owner, version=version, review_date=review_date)
+        data = file.file.read(MAX_UPLOAD_BYTES + 1)  # one byte over the limit is enough to know it's too big
+        return process_upload(request.app.state, file.filename, data,
+                              owner=owner, version=version, review_date=review_date)
+    finally:
+        UPLOAD_LOCK.release()
+
+
+def already_exists(filename: str) -> HTTPException:
+    return HTTPException(status_code=409, detail=f"a document named {filename} already exists")
+
+
+def process_upload(state: State, raw_name: str | None, data: bytes, *, owner: str, version: str,
+                   review_date: str) -> dict:
+    """Prepare, embed, insert, index: the upload itself, run while UPLOAD_LOCK is held. `state` is app.state."""
+    try:
+        prepared = prepare_upload(raw_name, data, owner=owner, version=version, review_date=review_date)
     except UploadRejected as e:
         raise HTTPException(status_code=e.status, detail=e.message)
+
+    # A quick check, so a duplicate isn't embedded for minutes first. Postgres's unique constraint still decides:
+    # two uploads of one name can both pass this check, and the second one's insert then gets the 409.
+    if document_exists(prepared.filename):
+        raise already_exists(prepared.filename)
+
+    # The slow, memory-hungry step comes before anything is stored: if the server dies here, nothing is left
+    # behind for the next start to trip over.
+    try:
+        embeddings = embed(prepared.chunks)
+    except Exception:
+        logger.exception(f"embedding the upload {prepared.filename} failed; nothing was stored")
+        raise HTTPException(status_code=500, detail=INDEXING_FAILED)
 
     try:
         document_id = insert_document(filename=prepared.filename, owner=prepared.owner, version=prepared.version,
                                       review_date=prepared.review_date, content=prepared.content,
-                                      content_sha256=prepared.content_sha256)
+                                      content_sha256=prepared.content_sha256,
+                                      chunks=chunk_rows(prepared.filename, prepared.chunks, embeddings))
     except DuplicateDocument:
-        raise HTTPException(status_code=409, detail=f"a document named {prepared.filename} already exists")
+        raise already_exists(prepared.filename)
 
     doc = {"filename": prepared.filename, "owner": prepared.owner, "version": prepared.version,
            "approved": False, "review_date": prepared.review_date}
     try:
-        index_document(request.app.state.collection, doc, prepared.chunks)
+        index_document(state.collection, doc, prepared.chunks, embeddings)
     except Exception:
-        # Whatever failed, the upload must not half-exist: remove the row, then report the failure.
+        # Whatever failed, the upload must not half-exist: remove the row (its chunks go with it), then report it.
         logger.exception(f"indexing the upload {prepared.filename} failed; removing its row")
         delete_document(document_id)
-        raise HTTPException(status_code=500,
-                            detail="indexing the document failed, so nothing was saved; please try again")
-    request.app.state.indexed_documents.add(prepared.filename)
+        raise HTTPException(status_code=500, detail=INDEXING_FAILED)
+    state.indexed_documents.add(prepared.filename)
 
     return {"filename": prepared.filename, "chunks": len(prepared.chunks), "approved": False}
 

@@ -5,12 +5,13 @@ from datetime import date
 
 from chromadb import Collection
 from google import genai
+from sqlalchemy.exc import SQLAlchemyError
 
-from db import log_query_db
+from db import log_query_db, read_stored_vectors
 from generate import generate_answer
 from govern import RELEVANCE_CUTOFF, classify, is_expired
 from ingest import chunk_document
-from retrieve import add_to_index, content_hash, make_chunk_id, search
+from retrieve import EMBEDDING_MODEL, add_to_index, content_hash, embed, make_chunk_id, search
 
 logger = logging.getLogger(__name__)
 
@@ -39,15 +40,46 @@ def chunk_ids_and_metadata(doc: dict, chunks: list[str]) -> tuple[list[str], lis
     return ids, metadatas
 
 
-def index_document(collection: Collection, doc: dict, chunks: list[str]) -> None:
-    """Add one document's chunks to the index. Startup and /upload both use it."""
+def chunk_rows(filename: str, chunks: list[str], embeddings: list[list[float]]) -> list[dict]:
+    """The document_chunks rows for one document: each chunk's id, text, hash and vector."""
+    return [{"chunk_id": make_chunk_id(filename, index, chunk), "chunk_index": index,
+             "content_hash": content_hash(chunk), "chunk_text": chunk, "embedding": embedding,
+             "embedding_model": EMBEDDING_MODEL}
+            for index, (chunk, embedding) in enumerate(zip(chunks, embeddings))]
+
+
+def index_document(collection: Collection, doc: dict, chunks: list[str], embeddings: list[list[float]]) -> None:
+    """Add one document's chunks, with their vectors, to the index. Startup and /upload both use it."""
     ids, metadatas = chunk_ids_and_metadata(doc, chunks)
-    add_to_index(collection, ids, chunks, metadatas)
+    add_to_index(collection, ids, chunks, metadatas, embeddings)
+
+
+def stored_embeddings(doc: dict, chunks: list[str]) -> list[list[float]] | None:
+    """The stored vectors of exactly these chunks, in order, or None unless every chunk has one.
+
+    A vector counts only if the current model computed it from the same text (same id, same full
+    hash). If the chunker or the model has changed since, or nothing was stored, it's None, and
+    the caller embeds the document again: slower, never stale.
+    """
+    try:
+        stored = read_stored_vectors(doc["id"], EMBEDDING_MODEL)
+    except SQLAlchemyError:
+        # The stored vectors are a cache: if they can't be read, embedding again costs time, not answers.
+        logger.exception(f"reading the stored vectors of {doc['filename']} failed")
+        return None
+    embeddings = []
+    for index, chunk in enumerate(chunks):
+        hash_and_vector = stored.get(make_chunk_id(doc["filename"], index, chunk))
+        if hash_and_vector is None or hash_and_vector[0] != content_hash(chunk):
+            return None
+        embeddings.append(hash_and_vector[1])
+    return embeddings
 
 
 def index_documents(collection: Collection, docs: list[dict]) -> tuple[list[str], list[dict]]:
     """Index each document's stored text, one document at a time, so one failure can't stop the rest.
 
+    Uses each document's stored vectors when they match its chunks, and embeds it otherwise.
     Returns the filenames indexed and the failures as {filename, reason}. A reason is a short fixed
     phrase, safe for /health to show; the details go to the log.
     """
@@ -59,7 +91,13 @@ def index_documents(collection: Collection, docs: list[dict]) -> tuple[list[str]
             failed.append({"filename": d["filename"], "reason": "no stored content"})
             continue
         try:
-            index_document(collection, d, chunk_document(d["content"]))
+            chunks = chunk_document(d["content"])
+            embeddings = stored_embeddings(d, chunks)
+            if embeddings is None:
+                logger.warning(f"re-embedding {d['filename']}: no stored vectors match its chunks "
+                               "(run backfill_vectors.py)")
+                embeddings = embed(chunks)
+            index_document(collection, d, chunks, embeddings)
         except Exception:
             # The index and its embedding model can fail in many ways; one bad document must not
             # stop startup. The traceback goes to the log, and /health lists the document.
