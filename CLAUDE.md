@@ -105,6 +105,7 @@ Indexing chunks each document with `ingest.chunk_document`, which follows the do
 | `documents/` | Seed documents only: the app never reads or writes it at runtime (`backfill_content.py`, `seed_eval_db.py`, `calibrate.py` and the tests read it). `metadata.json` covers only the first three |
 | `readme.md` | Public README (lowercase filename) |
 | `requirements-dev.txt` | Test tools on top of `requirements.txt`: pinned `pytest`. `httpx`, which FastAPI's `TestClient` needs, has been in `requirements.txt` since P0.4, because the app imports it. Render installs only `requirements.txt` |
+| `.github/workflows/keep-warm.yml` | Keeps Render's free instance awake for the demo period (temporary): every 10 minutes from 02:07 to 18:57 UTC (07:37–00:27 IST), `curl --fail` calls `/health`, retrying any failure 12 times, 15 s apart, 30 s per attempt; `workflow_dispatch` runs it by hand. Off minute 0: GitHub delays scheduled runs at the start of each hour and can drop them under load. Scheduled workflows run only from the default branch, so a change to it is committed on `main` alone (Raj allows each such commit), then `main` is merged into `upgrade`, so the ship's `git merge --ff-only upgrade` still works |
 | `docs/decisions.md` | Decision log, oldest first. Every task appends an entry (see "Working on a task") |
 | `audit_log.json`, `cache.json` | Local leftovers, gitignored. Don't use |
 | `UPGRADE_PLAN.md` | Task list. Local only, gitignored, never commit |
