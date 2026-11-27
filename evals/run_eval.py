@@ -7,6 +7,7 @@ evals/cache/ (gitignored), so re-running an unchanged configuration makes no mod
 import argparse
 import json
 import os
+import statistics
 import subprocess
 import time
 from datetime import date
@@ -18,14 +19,14 @@ from google.genai import errors
 from evals.eval_db import use_eval_database
 from evals.questions_v2 import QUESTIONS
 from evals.scoring import METRICS, cache_key, score_question, sha256_text, summarise
-from generate import MODEL, PROMPT_TEMPLATE, generate_answer
+from generate import GENERATION_CONFIG, MODEL, PROMPT_TEMPLATE, generate_answer, new_client
 from govern import RELEVANCE_CUTOFF
 from retrieve import new_index, search
 
 EVAL_HOST = use_eval_database()  # before the two imports below: db.py reads DATABASE_URL on import
 
 from db import read_documents_to_index  # noqa: E402
-from pipeline import TOP_K, ModelUnavailable, answer_question, index_documents  # noqa: E402
+from pipeline import TOP_K, ModelUnavailable, answer_question, index_documents, ms_since  # noqa: E402
 
 EVAL_TODAY = date(2026, 11, 18)  # fixed, so results don't change by themselves when a review date passes
 PAUSE_SECONDS = 2  # between model calls (paid tier)
@@ -58,21 +59,28 @@ class CachedGenerator:
         self.id_by_text = dict(zip(everything["documents"], everything["ids"]))
         self.calls = 0
         self.hits = 0
+        # How long each real model call took. Timed here, not taken from answer_question's timings_ms, which in
+        # the eval include the pause below and the cache lookups.
+        self.call_ms = []
 
     def generate(self, client: genai.Client, question: str, chunk_texts: list[str]) -> str:
         """Same signature as generate_answer: the cached answer, or a model call that is then cached."""
         # answer_question passes chunk texts only, so each chunk's id is looked up from its text.
         chunk_ids = [self.id_by_text[text] for text in chunk_texts]
-        key = cache_key(question, chunk_ids, chunk_texts, PROMPT_TEMPLATE, MODEL)
+        key = cache_key(question, chunk_ids, chunk_texts, PROMPT_TEMPLATE, MODEL, GENERATION_CONFIG)
         path = CACHE_DIR / f"{key}.json"
         if path.exists():
             self.hits += 1
             return json.loads(path.read_text())["answer"]
+        started = time.perf_counter()
         answer = call_with_retry(client, question, chunk_texts)
+        call_ms = ms_since(started)
         self.calls += 1
+        self.call_ms.append(call_ms)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"question": question, "chunk_ids": chunk_ids,
-                                    "model": MODEL, "answer": answer}, indent=1))
+        path.write_text(json.dumps({"question": question, "chunk_ids": chunk_ids, "model": MODEL,
+                                    "generation_config": GENERATION_CONFIG, "answer": answer,
+                                    "model_call_ms": call_ms}, indent=1))
         time.sleep(PAUSE_SECONDS)
         return answer
 
@@ -106,10 +114,10 @@ def run_questions(questions: list[dict], collection, client, generate) -> list[d
             result = answer_question(question["question"], collection, client,
                                      today=EVAL_TODAY, generate=generate)
         except ModelUnavailable as e:
-            if not isinstance(e.__cause__, errors.APIError):
-                raise  # not an error from the model API: a bug, so stop the run
+            # The model's own outage, after any retries. Anything else, a bug included, isn't ModelUnavailable and
+            # stops the run. A timeout or a lost connection has no HTTP code.
             result = None
-            error = {"code": e.__cause__.code, "message": str(e.__cause__)}
+            error = {"code": getattr(e.__cause__, "code", None), "message": f"{e}: {e.__cause__}"}
         chunks = passing_chunks(collection, result)
         rows.append({
             **question,
@@ -168,7 +176,7 @@ def main() -> None:
     if failed:
         raise SystemExit(f"eval documents could not be indexed: {failed}")
 
-    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    client = new_client(os.getenv("GOOGLE_API_KEY"))
     generator = CachedGenerator(collection)
     rows = run_questions(QUESTIONS, collection, client, generator.generate)
     summary = summarise(rows)
@@ -179,6 +187,7 @@ def main() -> None:
         "run_date": run_date,
         "eval_today": EVAL_TODAY.isoformat(),
         "model": MODEL,
+        "generation_config": GENERATION_CONFIG,
         "prompt_template_sha256": sha256_text(PROMPT_TEMPLATE),
         "top_k": TOP_K,
         "relevance_cutoff": RELEVANCE_CUTOFF,
@@ -188,10 +197,14 @@ def main() -> None:
         "chunks_indexed": collection.count(),
         "model_calls": generator.calls,
         "cache_hits": generator.hits,
+        "model_call_ms": generator.call_ms,  # each real call's time, in the order made; retry waits included
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     results_path.write_text(json.dumps({"run": run, "summary": summary, "rows": rows}, indent=1))
     print(f"\nwrote {results_path} ({generator.calls} model calls, {generator.hits} answers from the cache)")
+    if generator.call_ms:
+        print(f"model call: median {statistics.median(generator.call_ms):.0f} ms, "
+              f"slowest {max(generator.call_ms)} ms")
 
 
 if __name__ == "__main__":

@@ -24,11 +24,10 @@ import time
 from datetime import date
 from pathlib import Path
 
-from google import genai
-
 from evals.run_eval import EVAL_TODAY, RESULTS_DIR, CachedGenerator  # first: points DATABASE_URL at the eval database
 from evals.pdf_questions import PDF_QUESTIONS
 from evals.scoring import missing_facts, was_refused
+from generate import new_client
 from govern import RELEVANCE_CUTOFF
 from ingest import BROKEN_WORD, chunk_document, clean_pdf_text, clean_text
 from pipeline import TOP_K, answer_question, index_document
@@ -114,7 +113,7 @@ def main() -> None:
     parser.add_argument("--extract-only", action="store_true", help="no questions: no model, no database")
     args = parser.parse_args()
 
-    client = None if args.extract_only else genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    client = None if args.extract_only else new_client(os.getenv("GOOGLE_API_KEY"))
     paths = sorted(FIXTURES.glob("*.pdf")) + sorted((FIXTURES / "local").glob("*.pdf"))
     results = []
     for path in paths:

@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 from starlette.datastructures import State
@@ -5,11 +7,13 @@ from starlette.datastructures import State
 import api
 from db import DuplicateDocument
 from pdf_samples import blank_pdf, encrypted_pdf, numbered_sections
+from pipeline import ModelUnavailable
 from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id
 from upload import MAX_CHUNKS, MAX_PAGES, MAX_UPLOAD_BYTES
 
 FIELDS = {"owner": "Operations", "version": "1.0", "review_date": "2027-01-15"}
 VECTOR = [0.5, 0.25]  # what fake_embed gives every text
+DASHBOARD = "https://compliance-dashboard-omega-amber.vercel.app"  # an origin CORSMiddleware allows
 
 
 class FakeIndex:
@@ -31,7 +35,8 @@ def app_state(monkeypatch) -> State:
     A fresh State for each test, swapped in whole: a test can change it freely, and the app gets
     its own back afterwards.
     """
-    state = State({"collection": FakeIndex(), "indexed_documents": {"gdpr_ch3.txt"}, "failed_documents": []})
+    state = State({"collection": FakeIndex(), "client": None, "indexed_documents": {"gdpr_ch3.txt"},
+                   "failed_documents": []})
     monkeypatch.setattr(api.app, "state", state)
     monkeypatch.setattr(api, "database_reachable", lambda: True)
     monkeypatch.setattr(api, "document_exists", lambda filename: False)
@@ -103,6 +108,22 @@ def test_an_accepted_upload_is_stored_with_its_text_and_vectors_then_indexed_una
     assert "Retention Policy v2.txt" in app_state.indexed_documents
 
 
+def test_an_upload_logs_its_size_then_its_chunks_seconds_and_peak_memory(client, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="api")
+    monkeypatch.setattr(api, "insert_document", lambda **row: 41)
+    monkeypatch.setattr(api, "index_document", lambda collection, doc, chunks, embeddings: None)
+    assert upload(client, "policy.txt", b"Section 1. Scope").status_code == 200
+    received, stored = [record.getMessage() for record in caplog.records if record.name == "api"]
+    assert received.startswith("upload received: 16 bytes; peak memory so far ")
+    assert stored.startswith("upload stored policy.txt: 1 chunks in ")
+    assert stored.endswith(" MB")
+
+
+def test_peak_memory_is_reported_in_megabytes():
+    """Between 1 MB and 100 GB: kilobytes read as bytes, or bytes as kilobytes, would land far outside."""
+    assert 1 < api.peak_memory_mb() < 100_000
+
+
 def test_if_embedding_fails_nothing_is_stored_and_the_upload_reports_500(client, monkeypatch):
     def broken(texts):
         raise RuntimeError("model file missing")
@@ -157,6 +178,37 @@ def test_if_indexing_fails_the_row_is_removed_and_the_upload_reports_500(client,
     assert "nothing was saved" in response.json()["detail"]
     assert deleted == [41]
     assert "policy.txt" not in app_state.indexed_documents
+
+
+def test_a_model_outage_is_503_and_the_dashboard_can_read_it(client, monkeypatch):
+    def outage(question, collection, client):
+        raise ModelUnavailable("the model returned HTTP 503")
+
+    monkeypatch.setattr(api, "answer_question", outage)
+    response = client.post("/query", json={"question": "How fast must a breach be reported?"},
+                           headers={"Origin": DASHBOARD})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "model unavailable, please retry"}
+    assert response.headers["access-control-allow-origin"] == DASHBOARD
+
+
+def raise_a_bug(*args, **kwargs):
+    raise RuntimeError("secret detail: a bug in our own code")
+
+
+@pytest.mark.parametrize("method, path, broken", [
+    ("POST", "/query", "answer_question"),
+    ("GET", "/documents", "read_documents"),
+])
+def test_an_unexpected_error_on_any_route_is_a_logged_500_the_dashboard_can_read(client, monkeypatch, caplog,
+                                                                                method, path, broken):
+    monkeypatch.setattr(api, broken, raise_a_bug)
+    response = client.request(method, path, json={"question": "How fast must a breach be reported?"},
+                              headers={"Origin": DASHBOARD})
+    assert response.status_code == 500
+    assert response.json() == {"detail": "internal error"}  # never the exception's details
+    assert response.headers["access-control-allow-origin"] == DASHBOARD
+    assert "secret detail" in caplog.text  # the traceback is in the log instead
 
 
 def test_health_is_ok_when_the_database_answers_and_no_document_failed(client):

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import retrieve
 
 
@@ -19,6 +21,12 @@ def test_embed_sends_the_model_at_most_embed_batch_texts_per_call_and_keeps_thei
     monkeypatch.setattr(retrieve, "EMBED_BATCH", 2)
     assert retrieve.embed(["a", "bb", "ccc", "dddd", "eeeee"]) == [[1.0], [2.0], [3.0], [4.0], [5.0]]
     assert calls == [2, 2, 1]
+
+
+def test_the_model_lives_inside_the_project_so_the_build_can_ship_it():
+    """On Render only the project folder carries over from the build; anywhere else, every start downloads it."""
+    project = Path(retrieve.__file__).resolve().parent
+    assert Path(retrieve.EMBEDDER.DOWNLOAD_PATH).is_relative_to(project)
 
 
 def test_the_index_measures_l2_distance_with_the_shared_model():

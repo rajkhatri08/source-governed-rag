@@ -10,7 +10,8 @@ QUESTION = {
     "expected_facts": [["72 hours", "seventy-two hours"]],
     "expected_tier": "BRONZE",
 }
-ANSWERED = {"answer": "Within 72 hours.", "tier": "BRONZE", "sources": ["chunk_5"], "distances": [0.8]}
+ANSWERED = {"answer": "Within 72 hours.", "tier": "BRONZE", "refused": False, "sources": ["chunk_5"],
+            "distances": [0.8]}
 ART_33_CHUNK = {"source": "gdpr_ch3.txt", "text": "Art. 33 GDPR\nNotification of a personal data breach"}
 
 
@@ -22,10 +23,12 @@ def test_every_fact_list_must_match():
     assert missing_facts("You can learn the purposes.", [["purposes"], ["recipients"]]) == [["recipients"]]
 
 
-def test_early_return_and_model_refusal_both_count_as_refused():
-    assert was_refused({"answer": "No sufficiently relevant source found.", "sources": []})
-    assert was_refused({"answer": "I don't know.", "sources": ["chunk_1"]})
-    assert not was_refused({"answer": "Within 72 hours.", "sources": ["chunk_1"]})
+def test_the_refusal_score_reads_the_systems_own_flag():
+    assert was_refused({"answer": "No sufficiently relevant source found.", "sources": [], "refused": True})
+    assert was_refused({"answer": "The sources found don't contain the answer to this question.",
+                        "sources": ["chunk_1"], "refused": True})
+    assert not was_refused({"answer": "I don't know why the regulator chose it, but within 72 hours.",
+                            "sources": ["chunk_1"], "refused": False})
 
 
 def test_a_source_needs_both_its_document_and_its_heading():
@@ -50,9 +53,10 @@ def test_a_failed_question_stays_in_the_denominator_and_is_never_wrong():
 
 def test_cache_key_changes_when_any_input_changes():
     base = {"question": "q", "chunk_ids": ["chunk_1"], "chunk_texts": ["text"],
-            "prompt_template": "{context} {question}", "model": "m"}
+            "prompt_template": "{context} {question}", "model": "m", "generation_config": {}}
     changes = {"question": "q2", "chunk_ids": ["chunk_2"], "chunk_texts": ["other text"],
-               "prompt_template": "{question} {context}", "model": "m2"}
+               "prompt_template": "{question} {context}", "model": "m2",
+               "generation_config": {"thinking_config": {"thinking_level": "MINIMAL"}}}
     for field, value in changes.items():
         assert cache_key(**{**base, field: value}) != cache_key(**base), field
 

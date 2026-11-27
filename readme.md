@@ -47,11 +47,11 @@ FastAPI (Render)
 1. Question validated (400 on empty input)
 2. Retrieve top 5 chunks from ChromaDB
 3. **Filter to chunks below distance 1.2** — one filter, applied before both generation and governance
-4. Build warnings from the surviving chunks' metadata
-5. Generate an answer from those chunks only, with an instruction to refuse if the context does not contain it
+4. Build warnings from the surviving chunks' metadata: one per source and problem, in the order retrieved
+5. Generate an answer from those chunks only. The prompt tells the model to reply `NO_ANSWER_IN_CONTEXT` if the context does not contain the answer; a reply holding that token anywhere, or holding no text, is a refusal, and the user sees a fixed sentence instead
 6. Classify GOLD / SILVER / BRONZE
 7. Write an audit row to Postgres: the question, the answer, tier, reason and warnings, and every chunk the answer was drawn from, with its id, source document, content hash and distance
-8. Return answer, tier, reason, warnings, sources and distances
+8. Return answer, tier, reason, whether it was a refusal, warnings, sources, distances, and how many milliseconds retrieval, generation and the audit write took
 
 A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of its text}`. It comes from the chunk itself, so the same text gets the same id after every restart, and the hash in an audit row shows exactly which text an answer used.
 
@@ -62,8 +62,8 @@ A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of 
 | `ingest.py` | Clean and chunk text; rejoin hyphenated words |
 | `upload.py` | Every check on an upload, before anything is stored; text extraction from .txt and .pdf, dropping page furniture |
 | `retrieve.py` | The one embedding model; build the vector index, embed, search, add to a live index; content-derived chunk ids |
-| `generate.py` | Prompt construction and the model call |
-| `govern.py` | Expiry check and tier classification |
+| `generate.py` | Prompt construction, the Gemini client (with a timeout) and the model call |
+| `govern.py` | The refusal check, approval and review-date checks (fail closed), warnings and tier classification |
 | `db.py` | SQLAlchemy models, audit log, document metadata |
 | `api.py` | FastAPI endpoints |
 | `pipeline.py` | The question-answering pipeline, shared by the API and the evaluation |
@@ -108,9 +108,12 @@ The tier is decided by three checks, in order:
 ```python
 if model_refused:            return BRONZE, "no answer found in the available sources"
 if any_source_unapproved:    return BRONZE, "source not approved: ..."
+if any_source_without_date:  return SILVER, "source has no valid review date, so it counts as past review: ..."
 if any_source_expired:       return SILVER, "source past review date: ..."
                              return GOLD,   "answered from an approved, current source"
 ```
+
+**Unknown counts against the source.** Approved means exactly `True`: `False`, a missing value or `None` all count as unapproved. A missing or unreadable review date counts as past review, and the reason says so. A model refusal is recognised by a token the prompt asks for (`NO_ANSWER_IN_CONTEXT`), not by phrases like "I don't know", which also appear in real answers.
 
 **Order matters.** If governance were combined into a weighted score, a very close semantic match could outweigh the fact that nobody approved the document. Checking approval first and returning immediately makes that impossible.
 
@@ -146,7 +149,7 @@ PDF text is extracted with `pypdf` and cleaned in stages:
 - **There must be text to extract.** A PDF with no text layer (a scan), a password-protected PDF, a PDF that can't be read, or a .txt that isn't UTF-8 is refused with a message saying which.
 - **The text must fit the chunk limit:** 300 chunks (about 300,000 characters) unless `MAX_UPLOAD_CHUNKS` says otherwise. The live server sets 100 chunks (about 100,000 characters): embedding is the slow part of an upload, and there an upload takes about 3 seconds per chunk.
 
-A name that is already taken is refused next, before minutes of embedding are spent on it. Only then are the chunks embedded, and only then are the row, its text and its chunks' vectors inserted, in one transaction. That early name check doesn't decide: Postgres's unique constraint does, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved. One upload is processed at a time; another arriving meanwhile is asked to try again in a minute.
+A name that is already taken is refused next, before minutes of embedding are spent on it. Only then are the chunks embedded, and only then are the row, its text and its chunks' vectors inserted, in one transaction. That early name check doesn't decide: Postgres's unique constraint does, so two simultaneous uploads of one name can't both succeed. If indexing then fails, the row is removed again and the upload reports that nothing was saved. One upload is processed at a time; another arriving meanwhile is asked to try again in a few minutes.
 
 ---
 
@@ -239,7 +242,7 @@ The frontend is a separate repository: [compliance-dashboard](https://github.com
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Always HTTP 200: `status` (`ok` or `degraded`), whether the database answers, documents and chunks indexed, and the documents that failed to index at startup, each with a reason |
-| POST | `/query` | Ask a question; returns answer, tier, reason, warnings, sources |
+| POST | `/query` | Ask a question; returns answer, tier, reason, `refused` (true when there is no answer), warnings, sources, distances and `timings_ms` (retrieval, generation, audit write, total) |
 | GET | `/documents` | Document inventory with computed expiry status |
 | POST | `/upload` | Upload a `.txt` or `.pdf` (at most 10 MB, 300 pages and 300 chunks, or 100 chunks on the live server); stored in Postgres with its vectors, indexed immediately, unapproved by default |
 | POST | `/documents/{filename}/approve` | Approve a document |
@@ -253,8 +256,10 @@ Errors, each with a plain message in `detail`:
 - `409` on a duplicate filename
 - `413` on an upload over 10 MB, a PDF over 300 pages, or a text over the chunk limit
 - `422` on an upload with no extractable text, a password-protected or unreadable PDF, or a .txt that isn't UTF-8
-- `500` if indexing an upload fails (nothing is saved)
-- `503` when the model is unavailable, or while another upload is being indexed
+- `500` if indexing an upload fails (nothing is saved), and `{"detail": "internal error"}` for any other unexpected failure on any route; the details go to the server log, never to the client
+- `503` when the model is unavailable (Gemini answers 408, 429, 500, 502, 503 or 504, times out after a minute, or can't be reached), or while another upload is being indexed
+
+Every error response, the 500s included, carries the CORS headers, so the dashboard can show it.
 
 ---
 
@@ -282,7 +287,9 @@ These are real and worth stating plainly.
 
 **The evaluation set is 48 questions**, all written and labelled by one person. An answer's facts are checked by substring, which can pass a wrong answer that contains the phrase ("not 72 hours") and miss a correct one worded differently. Large enough to compare configurations against each other on the same questions; too small to claim an absolute accuracy figure with confidence.
 
-**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check and PDF-cleaning rule, the use of stored vectors at startup, and the `/upload` and `/health` endpoints. Nothing yet checks the tier rules in `govern.py`, such as how `is_expired` handles a malformed date, or the other endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
+**The model can ignore the refusal instruction.** A refusal is recognised by the token the prompt asks for (`NO_ANSWER_IN_CONTEXT`). A model that answers a question its sources don't cover, or refuses in its own words without the token, isn't caught: its reply is shown as an answer and tiered by its sources. In the P0.4 evaluation, each of the model's 14 refusals was the bare token and no answer refused in words ([docs/eval/p0.4.md](docs/eval/p0.4.md)), but that is 41 replies from one model version. A reply that mixes a partial answer with the token is refused, by design.
+
+**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check and PDF-cleaning rule, the use of stored vectors at startup, the refusal check, the fail-closed approval and review-date rules, warnings, the mapping of model failures to 503 (through the real Gemini SDK on a simulated network), the CORS headers on error responses, and the `/upload`, `/query` errors and `/health` endpoints. Nothing yet checks the order of the tier rules as a whole or the approve, revoke, retire and audit endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
 
 **Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 
@@ -290,7 +297,7 @@ These are real and worth stating plainly.
 
 **An audit row identifies the text it used but doesn't keep it.** The content hash proves which text an answer was drawn from. If a document's text later changes, the hash shows that it changed, not what it said before. Keeping that would need a history of document versions.
 
-**Cold starts.** Render's free tier sleeps after 15 minutes; the first request afterwards takes 30–50 seconds.
+**Cold starts.** Render's free tier sleeps after 15 idle minutes, and the next request waits for a full start. Measured in Render's logs on 22 Nov, the app's own start took about 49 seconds: 29 s importing its libraries on a tenth of a CPU, then 20 s of startup, which included downloading the embedding model (79 MB) from S3 every time. A restart or deploy took about 3 minutes in all; the rest is Render's. From P0.4, Render's build downloads the model once, and a start loads it from disk. The 29 s of imports remain the largest part.
 
 ---
 

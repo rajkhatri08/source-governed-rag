@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 
 import chromadb
 from chromadb.errors import NotFoundError
@@ -9,6 +10,13 @@ from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
 # default model, all-MiniLM-L6-v2 run with ONNX, but kept as one instance: Chroma's DefaultEmbeddingFunction
 # makes a new one, loading the model again (~170 MB), on every call. api.py's startup loads it once.
 EMBEDDER = ONNXMiniLM_L6_V2()
+# Where its files live: inside the project (gitignored), not in Chroma's default ~/.cache/chroma. On Render only
+# the project folder carries over from the build to the running service, so the model downloaded during the build
+# (Render's Build Command embeds one text) is loaded from disk at every start, instead of 79 MB fetched from S3
+# each time. Chroma downloads into it only if its files are missing, and checks the archive's SHA-256, so the
+# model, and every vector it computes, is the same as before.
+MODEL_FOLDER = Path(__file__).resolve().parent / "onnx_models" / ONNXMiniLM_L6_V2.MODEL_NAME
+EMBEDDER.DOWNLOAD_PATH = MODEL_FOLDER
 # Stored with each vector. Change it whenever the embedding function changes (requirements.txt pins
 # chromadb): startup then ignores the old vectors and embeds again, rather than mix two models' numbers.
 EMBEDDING_MODEL = "chromadb default: all-MiniLM-L6-v2 (ONNX)"

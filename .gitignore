@@ -7,6 +7,8 @@ audit_log.json
 .DS_Store
 UPGRADE_PLAN.md
 evals/cache/
+# The embedding model's files (about 170 MB), downloaded by Render's build or the first local start (retrieve.py)
+onnx_models/
 
 # P0.3b test PDFs that are large or not ours to publish: kept locally, sources in evals/fixtures/pdfs/README.md
 evals/fixtures/pdfs/local/

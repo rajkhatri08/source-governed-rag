@@ -556,3 +556,103 @@ Commits: `5c77ebd` (the docs updated with the measurement) and the one that adds
 - Revisit with background indexing or a paid instance if 100 chunks proves too few.
 
 **How it was verified.** On production at Ship 1: the 71-chunk upload finished without an out-of-memory restart, and after a restart `/health` showed 5 documents and 98 chunks with no "re-embedding" line. With the limit at 100, `nist_ai_rmf_1.0.pdf` was refused within seconds.
+
+---
+
+## 22 Nov 2026 · P0.4: refusals by token, failures that say what they are, governance that fails closed, timings, the model in the build
+
+Commits: the P0.4 commit in each repo. Measurements: [docs/eval/p0.4.md](eval/p0.4.md).
+
+**Context.**
+- **Refusals were guessed from wording.** An answer counted as a refusal if it contained "don't know". That also matches real answers ("I don't know why the regulator…") and misses refusals worded otherwise. In P0.5, 4 of the model's 14 refusals had text around the phrase.
+- **Failures were mislabelled or unreadable.**
+  - Every failure while generating became 503 "model unavailable", a bug in our own code included.
+  - Any other unexpected exception, on any route, got Starlette's plain-text 500. That reply leaves outside the CORS middleware, so the browser hides it and the dashboard sees "backend unreachable".
+  - Gemini calls had no timeout, so a hung call held its request for ever.
+- **Governance failed open.** `approved == False` let `None` through as approved, and `is_expired` crashed on a missing or malformed review date.
+- **Warnings repeated** once per passing chunk: 9 of the 48 eval questions showed a duplicate.
+- **Nothing was measured per request.** Render's free tier shows no memory graph, and a restart's 3 minutes weren't split.
+- **Every start downloaded the embedding model (79.3 MB) from S3** into Chroma's cache in the home folder, which Render doesn't carry over from the build. Suspected since P0.3b; confirmed in Render's logs (below).
+
+**Decision.**
+- **A refusal token.** The prompt tells the model to reply `NO_ANSWER_IN_CONTEXT` when the context doesn't hold the answer. A reply holding the token anywhere, or holding no text (a blocked reply), is a refusal. The user and the audit row get a fixed sentence, and the response says `refused: true`, as it does when no chunk passes the filter.
+- **Failures say what they are.**
+  - **The model's own outages become `ModelUnavailable` → 503:** an `APIError` with code 408, 429, 500, 502, 503 or 504 (the codes google-genai itself retries on), or an `httpx.TransportError` (a timeout or a failed connection). Any other `APIError`, such as 400 or 403, is a fault to fix, not an outage.
+  - **The 503 comes from an exception handler,** which runs inside CORS.
+  - **Any other unhandled exception, on any route,** reaches a small middleware registered before CORS, so that CORS wraps it. The traceback goes to the log; the client gets `{"detail": "internal error"}` with CORS headers.
+  - **The Gemini client has a 60-second timeout** for each phase of a call, and the SDK doesn't retry by default. `httpx` becomes a direct dependency, pinned at the version already installed.
+- **Fail closed.** Approved means exactly `True`. A missing or unreadable review date counts as past review, with a reason that says so.
+  - Chroma refuses `None` as a metadata value. So where the index metadata is built (`chunk_ids_and_metadata`), a NULL `approved` is stored as `False` and a NULL `review_date` as `""`.
+  - Without that mapping, such a document failed to index, and neither rule could ever apply to real data. Now a NULL-approved document is indexed as unapproved (BRONZE whenever it's used), and a NULL date reaches the "no valid review date" rule.
+- **One warning per source and problem,** in the order retrieved: `dict.fromkeys`, because a set's order changes between runs. The warnings move into `govern.py`, beside the tier rules.
+- **Measurements.**
+  - Each answer returns `timings_ms` (retrieval, generation, audit write, total) and logs one line with them, never the question.
+  - Each upload logs its size and the peak memory so far, then its chunks, seconds and peak memory.
+  - Startup logs how long the embedding model and the index took, and the peak memory.
+  - Logging is configured once, at INFO.
+- **Thinking stays at the model's default.** MINIMAL passed the pre-registered keep rule and was overridden (below).
+- **The model ships with the build.** `retrieve.EMBEDDER` keeps its files in `onnx_models/` inside the project (gitignored). Render's Build Command embeds one text after installing the requirements, which downloads the model there:
+  `pip install -r requirements.txt && python -c "import retrieve; retrieve.embed(['warm-up'])"`
+  Only the project folder carries over from Render's build to the running service, so every start then loads the model from disk. Chroma downloads only if the files are missing, and checks the archive's SHA-256.
+- **"In a minute" became "in a few minutes"** in the upload-in-progress 503 and in the dashboard's reload hint: an upload on Render can take about 5 minutes.
+
+**Alternatives considered.**
+- **The token alone, as first specified** (whitespace and a trailing full stop allowed). It would miss the kind of preamble and explanation the model put around "I don't know" in P0.5, and would show the token to the user, possibly as GOLD. In run 1 the model sent the bare token every time, so the wider rule cost nothing.
+- **Keeping the model's raw reply in the audit row.** More evidence, but the response and the audit row would disagree about what the user was told. The tier reason records the refusal.
+- **Catching errors in `/query` only** (the first plan): every other route kept the 500 the dashboard can't read. **A global `exception_handler(Exception)`** has the same problem, because Starlette runs it outside CORS.
+- **Only 429, 500 and 503 as outages** (the task's list): 408, 502 and 504 are also Google-side, and google-genai treats all six as transient.
+- **No new dependency:** a timeout or a lost connection would have been a 500 "internal error", and a hung call would have waited for ever.
+- **For the model:**
+  - **Keep downloading it at each start.** About 6 s on a good day, but the newest start's download began at 17 kiB/s with a first estimate of 16 minutes: every cold start depended on S3.
+  - **Commit it to git:** 79 MB of binary in the repository.
+  - **A persistent disk:** not on Render's free tier.
+- **Keeping MINIMAL thinking, as the rule said.** Calls took 1.5 s at the median, against 3.3 s. But in a repeat check the model refused "what is our deadline for reporting a personal data breach?" 5 times out of 5 (0 of 5 at default), and the subject-access deadline question 4 of 5. Raj overrode the rule, because those are the conflict questions Phase 2 is built on.
+
+**Consequences and limitations.**
+- **The model can still ignore the token:** answer a question its sources don't cover, or refuse in its own words. In run 1, each of the model's 14 refusals was the bare token and none was in words, but that is 41 replies from one model version. A partial answer that includes the token is refused, by design.
+- **The refusal metric changed with the system.** It now reads `refused`; the baseline and P0.5 were scored by "don't know". Run 1 refused the same 21 questions as P0.5.
+- **Facts lost one question** (v2-paraphrase-01). In P0.5 the model's "I don't know" came with an explanation that held the expected facts; the bare token doesn't.
+- **NULLs are mapped for the index, not kept.** The index holds `False` or `""` where Postgres holds NULL, so it can't tell "unknown" from "unapproved" or "unreadable date"; both get the same fail-closed treatment. P1.1 moves governance out of the index, and `is_approved` then reads the NULL from Postgres itself. `owner` and `version` have the same NULL problem, but no rule reads them, and P1.1 drops them from the index.
+- **The middleware's position matters.** Added after CORS, its 500 would lose the CORS headers again; a test checks the header on both the 500 and the 503.
+- **The timeout applies per phase,** so a connection slow to open *and* slow to reply could take about two minutes. An answer slower than a minute becomes a 503; run 1's slowest call took 5.4 s.
+- **A pre-registered rule was overridden.** It counted totals only; the next one should protect each group too.
+- **Upload seconds exclude the network transfer.** Peak memory is the process's lifetime peak, so only a rise between the two lines is the upload's.
+- **The model download moves to the build.**
+  - Each build takes longer by the download, and its output is about 177 MB larger (the archive plus the extracted model).
+  - If S3 is unreachable, the build fails, and Render keeps the running version, rather than a start stalling.
+  - The Build Command lives in Render's settings, not in the repository; `CLAUDE.md` records it. Without it the code still works, downloading at each start as before.
+  - Locally, the first start after this change downloads the model once into `onnx_models/`.
+- **The 29 s of imports are the largest part of the app's start,** left as they are in this task.
+- **The local `.venv` holds `openai`,** which brings the `httpx2` fork. Neither is in `requirements.txt`, and the SDK's synchronous client uses `httpx` either way (checked).
+
+**How it was verified.**
+- **pytest:** 208 passed (156 before), none touching a database or the model:
+  - the refusal check, fail-closed approval and review dates, warnings
+  - model failures through the real google-genai client on a simulated network (`httpx.MockTransport`): the 60-second timeout reaches httpx; a timeout, a lost connection and an HTTP 503 end as `ModelUnavailable`; an HTTP 400 doesn't; a blocked reply is a refusal
+  - approval and review date round-tripped through startup into a real in-memory Chroma index: `True` comes back as `True`, a NULL approval indexes as unapproved (BRONZE), and a NULL date gives SILVER with the "no valid review date" reason. Before the mapping, a NULL made Chroma refuse the chunk ("Cannot convert Python object to MetadataValue")
+  - the 500 on `/query` and `/documents` and the 503, each with `access-control-allow-origin` for the dashboard's origin
+  - the upload log lines, and the units of peak memory
+- **The middleware order,** on three throwaway apps. Without the middleware, a plain-text 500 without CORS headers; added after CORS, JSON without them; added before it, JSON with them.
+- **The installed SDK's behaviour,** on a simulated network. Timeouts and connection failures arrive as `httpx` exceptions, unwrapped. The API key travels in a header, never in the URL, so httpx's log line can't leak it.
+- **Startup, in-process,** against the local database: both startup lines appeared, and `/health` was ok.
+- **The evaluation** ([docs/eval/p0.4.md](eval/p0.4.md)):
+  - run 1: refusal 41/48, facts 25/34, tier 31/48, sources 22/34, against P0.5's 41, 26, 31 and 22; retrieval identical; no repeated warning;
+  - the thinking trial and its repeat check, as above.
+- **The cold start (step 6), from Render's logs on 22 Nov (Raj):**
+  - **The download.** Every start downloaded the model: `/opt/render/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx.tar.gz`, 79.3 MB, about 6 s at 12.3 MiB/s on the newest start. It began at 17 kiB/s, with a first estimate of 16 minutes.
+  - **The newest start** (instance `l6ccq`):
+
+    | Time | Event |
+    |---|---|
+    | 4:49:26 PM | Render runs `uvicorn api:app --host 0.0.0.0 --port $PORT` |
+    | 4:49:55 PM | "Started server process": **29 s of imports** |
+    | 4:50:03 PM | the model download starts; done about 6 s later |
+    | 4:50:15 PM | "Application startup complete.": **20 s of startup** (the lifespan handler) |
+
+  - **The split.** The app's own start is about 49 s of a ~3-minute restart; the rest is Render's. Every start since Ship 1 shows the same 20–21 s of startup (21, 21, 20, 21, 20 s).
+  - **The AFC warning.** Production logged "Direct use of automatic function calling…" at 4:48:28 PM. `GENERATION_CONFIG` now removes it.
+- **The fix, locally:**
+  - The build's warm-up downloaded the model into `onnx_models/`. The archive's SHA-256 matches Chroma's (`913d7300…`).
+  - All six model files are byte-identical to the copy in `~/.cache/chroma`, and the vectors they produce are bit-identical, so every stored vector stays valid.
+  - A test keeps the model folder inside the project.
+- **The fix on Render** is checked at Ship 2: the build log shows the download, and a start shows none, with a shorter "embedding model ready" line.

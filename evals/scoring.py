@@ -2,8 +2,6 @@
 import hashlib
 import json
 
-from govern import is_refusal
-
 METRICS = ["refusal", "facts", "tier", "sources"]
 
 
@@ -12,20 +10,24 @@ def sha256_text(text: str) -> str:
 
 
 def cache_key(question: str, chunk_ids: list[str], chunk_texts: list[str],
-              prompt_template: str, model: str) -> str:
+              prompt_template: str, model: str, generation_config: dict) -> str:
     """One hash over everything that can change the model's answer."""
     payload = {
         "question": question,
         "chunks": [[chunk_id, sha256_text(text)] for chunk_id, text in zip(chunk_ids, chunk_texts)],
         "prompt_template_sha256": sha256_text(prompt_template),
         "model": model,
+        "generation_config": generation_config,  # e.g. a thinking level
     }
     return sha256_text(json.dumps(payload, sort_keys=True))
 
 
 def was_refused(result: dict) -> bool:
-    """True if no chunk passed the relevance filter, or the model said it couldn't answer."""
-    return len(result["sources"]) == 0 or is_refusal(result["answer"])
+    """True if the system gave no answer: no chunk passed the relevance filter, or the model refused.
+
+    Read from the system's own `refused` flag, which answer_question sets in both cases.
+    """
+    return result["refused"]
 
 
 def normalise(text: str) -> str:

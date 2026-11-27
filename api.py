@@ -1,31 +1,47 @@
 import logging
 import os
+import resource
+import sys
 import threading
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from google import genai
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File, Form
 from fastapi.datastructures import State
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 
 from govern import is_expired
 from db import (DuplicateDocument, database_reachable, delete_document, document_exists, insert_document,
                 read_documents, read_documents_to_index, read_log_db, set_approved, set_retired)
+from generate import new_client
 from pipeline import ModelUnavailable, answer_question, chunk_rows, index_document, index_documents
 from retrieve import embed, new_index
 from upload import MAX_UPLOAD_BYTES, UploadRejected, prepare_upload
 
 load_dotenv()
+# Logging is configured once, here, because api.py is what uvicorn loads. INFO, so that the timings and the startup
+# and upload lines reach the log; each line says when it was written and how serious it is.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 STARTUP_RETRY_WAITS = [1, 2, 4, 8]  # seconds between attempts: Neon's free compute takes a moment to wake
 INDEXING_FAILED = "indexing the document failed, so nothing was saved; please try again"
 # One upload at a time: two large PDFs parsed and embedded at once could exhaust a 512 MB server.
 UPLOAD_LOCK = threading.Lock()
+
+
+def peak_memory_mb() -> float:
+    """The most memory this process has held at once since it started, in MB. It never goes down.
+
+    ru_maxrss counts kilobytes on Linux (Render) and bytes on macOS.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
 
 
 def read_documents_with_retry() -> list[dict]:
@@ -46,21 +62,41 @@ def read_documents_with_retry() -> list[dict]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs once, before the first request is served: load the embedding model, index the text stored in Postgres."""
+    started = time.perf_counter()
     # The one embedding model every question, upload and re-embedding uses (retrieve.EMBEDDER), loaded now so
     # that the first question doesn't wait for it: on Render, whose disk is ephemeral, that includes downloading it.
     try:
         embed(["warm-up"])
+        logger.info(f"startup: embedding model ready in {time.perf_counter() - started:.1f} s")
     except Exception:
         logger.exception("loading the embedding model failed at startup; the first question will try again")
-    app.state.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    app.state.client = new_client(os.getenv("GOOGLE_API_KEY"))
     app.state.collection = new_index()
     indexed, failed = index_documents(app.state.collection, read_documents_with_retry())
     app.state.indexed_documents = set(indexed)
     app.state.failed_documents = failed
+    logger.info(f"startup: index ready in {time.perf_counter() - started:.1f} s: {len(indexed)} documents, "
+                f"{app.state.collection.count()} chunks, {len(failed)} failed; peak memory {peak_memory_mb():.0f} MB")
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# Registered before CORSMiddleware on purpose: Starlette puts the middleware added last on the outside, so CORS
+# wraps this one, and a 500 made here leaves with CORS headers the dashboard needs to read it. An exception that
+# nothing catches is answered by Starlette outside CORS instead: the browser hides that reply, and a bug looks
+# like "backend unreachable".
+@app.middleware("http")
+async def internal_error(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Any exception a route didn't handle: the traceback goes to the log, the client gets a fixed message."""
+    try:
+        return await call_next(request)
+    except Exception:
+        # !r: a path is decoded, so a filename with %0A in it could otherwise start a fake line in the log
+        logger.exception(f"unhandled error on {request.method} {request.url.path!r}")
+        return JSONResponse(status_code=500, content={"detail": "internal error"})
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +107,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(ModelUnavailable)
+async def model_unavailable(request: Request, exc: ModelUnavailable) -> JSONResponse:
+    """The model is busy, failing or out of reach: 503, which tells the client that a retry may work.
+
+    Exception handlers run inside CORS, so the dashboard can read this reply too.
+    """
+    logger.warning(f"model unavailable: {exc}")
+    return JSONResponse(status_code=503, content={"detail": "model unavailable, please retry"})
 
 
 class Query(BaseModel):
@@ -93,13 +139,10 @@ def health(request: Request):
 
 @app.post("/query")
 def query(q: Query, request: Request):
+    """ModelUnavailable becomes a 503 (model_unavailable); any other failure, a 500 (internal_error)."""
     if not q.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
-
-    try:
-        return answer_question(q.question, request.app.state.collection, request.app.state.client)
-    except ModelUnavailable:
-        raise HTTPException(status_code=503, detail="model unavailable, please retry")
+    return answer_question(q.question, request.app.state.collection, request.app.state.client)
 
 
 @app.get("/documents")
@@ -125,14 +168,22 @@ def upload(
     one arriving meanwhile is refused with 503.
     """
     if not UPLOAD_LOCK.acquire(blocking=False):
-        raise HTTPException(status_code=503, detail="another upload is being indexed; please try again in a minute",
+        raise HTTPException(status_code=503,
+                            detail="another upload is being indexed; please try again in a few minutes",
                             headers={"Retry-After": "60"})
+    started = time.perf_counter()
     try:
         data = file.file.read(MAX_UPLOAD_BYTES + 1)  # one byte over the limit is enough to know it's too big
-        return process_upload(request.app.state, file.filename, data,
-                              owner=owner, version=version, review_date=review_date)
+        # Peak memory is logged before and after: it only ever rises, so a rise between the two lines is this
+        # upload's own. Render's free tier shows no memory graph, so these lines are the measurement.
+        logger.info(f"upload received: {len(data):,} bytes; peak memory so far {peak_memory_mb():.0f} MB")
+        result = process_upload(request.app.state, file.filename, data,
+                                owner=owner, version=version, review_date=review_date)
     finally:
         UPLOAD_LOCK.release()
+    logger.info(f"upload stored {result['filename']}: {result['chunks']} chunks in "
+                f"{time.perf_counter() - started:.1f} s; peak memory {peak_memory_mb():.0f} MB")
+    return result
 
 
 def already_exists(filename: str) -> HTTPException:
