@@ -5,9 +5,10 @@ name: keep-warm
 
 on:
   schedule:
-    # Every 10 minutes from 02:00 to 18:50 UTC (07:30 to 00:20 IST): GitHub's cron runs in UTC. GitHub runs
-    # scheduled workflows only from the default branch (main), and may start a run late when it is busy.
-    - cron: "*/10 2-18 * * *"
+    # Every 10 minutes at minutes 7, 17 … 57, from 02:07 to 18:57 UTC (07:37 to 00:27 IST): GitHub's cron runs
+    # in UTC. Not at minute 0, because GitHub delays scheduled runs at the start of each hour and can drop them
+    # under load. GitHub runs scheduled workflows only from the default branch (main).
+    - cron: "7-59/10 2-18 * * *"
   workflow_dispatch: # adds a "Run workflow" button in the Actions tab, to run it by hand
 
 permissions: {} # the job only calls a public URL: it needs no access to the repository
