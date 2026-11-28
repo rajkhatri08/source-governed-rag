@@ -11,6 +11,9 @@ MAX_CHUNK_CHARS = 1500  # a longer article is split at its numbered paragraphs, 
 MAX_TITLE_CHARS = 300  # the lines before the first heading start every piece only if they are this short: a title
 PACK_CHARS = 1000  # with no headings, lines are packed into chunks of up to this size
 OVERLAP_CHARS = 50  # when a line has to be cut, as in the 1000/50 run of August
+# Letter pairs that some PDFs store as one typographic character: gdpr1.pdf reads "aﬀect" for "affect". Replaced one
+# by one, not with Unicode's NFKC normalisation, which would also rewrite "m²" as "m2" and "½" as "1⁄2".
+LIGATURES = {"ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
 
 
 def chunk_text(document, size, overlap):
@@ -128,7 +131,8 @@ def join_broken_words(text: str) -> str:
 
 
 def clean_pdf_text(document):
-    document = document.replace("ﬁ", "fi").replace("ﬂ", "fl")
+    for ligature, letters in LIGATURES.items():
+        document = document.replace(ligature, letters)
     document = re.sub(r"(?<![.\n])\n(?![A-Z0-9(])", " ", document)
     document = re.sub(r" +", " ", document)
     return document

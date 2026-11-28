@@ -3,12 +3,14 @@ from datetime import date
 import pytest
 
 from generate import PROMPT_TEMPLATE
-from govern import REFUSAL_SENTINEL, classify, is_approved, is_expired, is_refusal, source_warnings
+from govern import (RELEVANCE_CUTOFF, REFUSAL_SENTINEL, classify, is_approved, is_expired, is_refusal,
+                    source_warnings)
 
 TODAY = date(2026, 11, 18)
 GDPR = {"source": "gdpr_ch3.txt", "approved": True, "review_date": "2027-05-25"}
 RETENTION = {"source": "retention_policy_v1.txt", "approved": True, "review_date": "2023-01-15"}  # past review
 DRAFT = {"source": "draft_ai_policy.txt", "approved": False, "review_date": "2027-12-31"}
+UNDATED = {"source": "undated_policy.txt", "approved": True, "review_date": None}  # approved, no valid review date
 UNREADABLE_DATES = [None, "", "next year", "2027-02-30"]
 
 
@@ -77,6 +79,48 @@ def test_an_approved_current_source_is_gold():
 def test_a_refusal_is_bronze():
     assert classify([GDPR], [0.8], "NO_ANSWER_IN_CONTEXT", TODAY) == (
         "BRONZE", "no answer found in the available sources")
+
+
+# The order of the rules: refusal, then no relevant source, then approval, then review date.
+
+@pytest.mark.parametrize("source", [DRAFT, RETENTION, UNDATED])
+def test_a_refusal_comes_first_whatever_the_state_of_its_sources(source):
+    assert classify([source], [0.8], "NO_ANSWER_IN_CONTEXT", TODAY) == (
+        "BRONZE", "no answer found in the available sources")
+
+
+@pytest.mark.parametrize("metas, distances", [([], []), ([DRAFT], [1.3]), ([GDPR], [RELEVANCE_CUTOFF])])
+def test_with_no_source_under_the_cutoff_the_answer_is_bronze_never_gold(metas, distances):
+    assert classify(metas, distances, "Within 72 hours.", TODAY) == ("BRONZE", "no relevant source in the corpus")
+
+
+@pytest.mark.parametrize("metas", [[RETENTION, DRAFT], [DRAFT, RETENTION], [UNDATED, DRAFT]])
+def test_an_unapproved_source_outranks_any_review_date_problem_in_either_order(metas):
+    assert classify(metas, [0.7, 0.9], "An answer.", TODAY) == ("BRONZE", "source not approved: draft_ai_policy.txt")
+
+
+def test_one_unapproved_source_makes_an_answer_from_an_approved_current_one_bronze():
+    assert classify([GDPR, DRAFT], [0.7, 0.9], "Within 72 hours.", TODAY) == (
+        "BRONZE", "source not approved: draft_ai_policy.txt")
+
+
+def test_one_source_past_review_makes_an_answer_from_an_approved_current_one_silver():
+    assert classify([GDPR, RETENTION], [0.7, 0.9], "Within 72 hours.", TODAY) == (
+        "SILVER", "source past review date: retention_policy_v1.txt")
+
+
+def test_of_two_review_date_problems_the_source_retrieved_first_gives_the_reason():
+    # Both are SILVER; the warnings name every problem, the reason names the first source with one
+    assert classify([RETENTION, UNDATED], [0.7, 0.9], "An answer.", TODAY) == (
+        "SILVER", "source past review date: retention_policy_v1.txt")
+    assert classify([UNDATED, RETENTION], [0.7, 0.9], "An answer.", TODAY) == (
+        "SILVER", "source has no valid review date, so it counts as past review: undated_policy.txt")
+
+
+def test_a_source_at_the_cutoff_takes_no_part_in_the_tier():
+    # The filter keeps distances strictly below the cutoff: an unapproved source at exactly 1.2 can't veto
+    assert classify([GDPR, DRAFT], [0.8, RELEVANCE_CUTOFF], "Within 72 hours.", TODAY) == (
+        "GOLD", "answered from an approved, current source")
 
 
 def test_a_source_with_several_chunks_gets_each_warning_once():

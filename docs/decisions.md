@@ -656,3 +656,59 @@ Commits: the P0.4 commit in each repo. Measurements: [docs/eval/p0.4.md](eval/p0
   - All six model files are byte-identical to the copy in `~/.cache/chroma`, and the vectors they produce are bit-identical, so every stored vector stays valid.
   - A test keeps the model folder inside the project.
 - **The fix on Render** is checked at Ship 2: the build log shows the download, and a start shows none, with a shorter "embedding model ready" line.
+
+## 28 Nov 2026 · P0.6: tests against a real database, the order of the tier rules, and CI
+
+Commits: the P0.6 commit in each repo.
+
+**Context.**
+- **The tests used no database.** The paths that matter when something goes wrong had been checked once, by hand, on a scratch database (P0.3, P0.3b): Postgres refusing a duplicate name (SQLSTATE 23505), the clean-up delete after a failed index and its cascade to the chunks, the stored vectors, the approve, unapprove, retire and audit endpoints.
+- **No test checked the order of the tier rules as a whole.** Writing those tests found that `classify` returned **GOLD when no source passed the cutoff**: `classify([], [], "…")`, or an unapproved source at distance 1.3. Neither `/query` nor the eval could reach it, because `answer_question` returns BRONZE before calling `classify` when nothing passes; but it was a fail-open path in the function that decides trust.
+- **`clean_pdf_text` replaced `ﬁ` and `ﬂ` but not `ﬀ`, `ﬃ` or `ﬄ`:** `gdpr1.pdf` read "aﬀect".
+- **Nothing ran the tests automatically.**
+
+**Decision.**
+- **A test database, `compliance_test`,** named by `TEST_DATABASE_URL`. `testdb.check_test_url` stops on a `neon.tech` host and on any other database name, which also keeps the tests off the development database. `alembic -x db=test` uses the same check, and an unknown `-x db=` value now stops instead of falling through to `DATABASE_URL`.
+- **`conftest.py` points the whole test session, before any test file is imported,** at the test database, or at an `.invalid` host when there is none: no test can reach the dev database or Neon, even by mistake. Without `TEST_DATABASE_URL`, the database tests are skipped, and pytest's summary counts them. On CI (`CI=true`), a missing URL stops the run instead, so they can't be skipped there unnoticed.
+- **Each database test runs inside one transaction, rolled back at the end.** `db.Session` is swapped for a sessionmaker bound to that connection with `join_transaction_mode="create_savepoint"`: the app's commits commit savepoints inside it, and its rollback after a duplicate goes back to its savepoint. No test deletes anything. The database is empty before and after every run, and a run stops at once if it isn't empty or isn't at the head revision.
+- **The API tests on the real database** drive the app through `TestClient` with a real in-memory index and a fake embedding model, and the `/query` tests send Gemini's requests to `httpx.MockTransport` through the real SDK. The tests against fakes stay: they prove that a rejected upload never reaches the database at all.
+- **`classify` fails closed:** no source under the cutoff → BRONZE, "no relevant source in the corpus", the reason `answer_question` already gives; one constant, `NO_RELEVANT_SOURCE`, for both. New tests pin the rest of the order as it was: a refusal first, then approval in any retrieval order, then review dates, where the first source with a date problem names the reason.
+- **`clean_pdf_text` replaces all five f-ligatures from a table,** not with Unicode's NFKC normalisation, which would also rewrite "m²" as "m2" and "½" as "1⁄2".
+- **CI on every push and pull request.**
+  - **Backend:** a `postgres:18` service container (Neon's major version), Python 3.14 (Render's), `alembic -x db=test upgrade head` on the empty database, `alembic -x db=test check`, `pytest`.
+  - **Frontend:** Node 24 (Vercel's), `npm ci`, `npm run lint`, `npm run build`.
+  - **No secrets.** Gemini is mocked, the tests pass their own vectors so the embedding model is never downloaded, and the database's password is a placeholder for a container that lives only as long as the job.
+
+**Alternatives considered.**
+- **Emptying the tables between tests (`TRUNCATE`).** Easier to read, but destructive SQL on every run, which the project's rules allow only with a fresh go-ahead each time. The rollback needs none.
+- **Running the migrations from inside pytest.** Alembic's `env.py` calls `logging.config.fileConfig`, which turns off every logger already created, the app's included, and would break the tests that read log lines. They stay a separate step, shown on its own line in CI; `conftest.py` only checks the revision.
+- **Skipping the database tests on CI too, as locally.** A typo in the workflow would then switch them all off, with CI still green.
+- **Removing the second relevance filter inside `classify`** instead (design principle 4: one filter, applied once). It is redundant behind `answer_question`, but removing it changes `classify`'s signature and every caller; P1.1 reworks that code anyway.
+
+**Consequences and limitations.**
+- **The race itself isn't reproduced.** The test skips the name check, so that the second insert of a name meets the unique constraint, which is what a race between two uploads comes down to.
+- **Each test sees only its own transaction:** nothing checks what a second connection would see after a commit.
+- **The startup handler as a whole still isn't run by a test:** it would load the embedding model, a 79 MB download on CI. Its parts are tested separately, its database retries included.
+- **`ﬀ`, `ﬃ` and `ﬄ` are replaced only in PDFs uploaded after this ships;** stored text can't be extracted again. Of the test PDFs, only `gdpr1.pdf` contains them, and it is in no database.
+- **After any new migration,** `compliance_test` needs `alembic -x db=test upgrade head`; a test run stops and says so.
+- **The CI badge shows "no status"** until Ship 2 puts the workflow on `main`.
+
+**How it was verified.**
+- **Against `compliance_test`, built from nothing by the migrations.** `alembic -x db=test upgrade head` ran 0001 → 0004 on the empty database, and `alembic -x db=test check` found no new upgrade operations. So the models match what the migrations build, not only what the stamped databases hold.
+- **The suite:**
+  - **With the database:** 261 passed and 0 skipped, in about 3 s, three runs in a row. `test_api.py` and `test_db.py` alone, in the other order, pass too.
+  - **Without `TEST_DATABASE_URL`:** 240 pass and the 21 database tests skip.
+  - **A clean copy with no `.env` and no `onnx_models/`:** the same result, and the model is not downloaded.
+- **The rollback.** After the runs, the three tables hold 0 rows. After the first run, their id sequences stood at 15 (documents), 20 (chunks) and 4 (audit rows). Postgres doesn't wind a sequence back, not even for a refused insert, so those numbers count the inserts that ran. The tests really wrote rows, and every one was undone without a `DELETE`.
+- **The stops that a migrated, empty database never reaches,** triggered from a throwaway plugin that wrote nothing:
+  - **A newer head** stops the run with "compliance_test is at revision 0004, not 9999: run `alembic -x db=test upgrade head`".
+  - **Rows in the tables** stop it with their counts.
+  - **An unreachable database** stops it with the connection error.
+
+  Each exits with a non-zero code, which fails CI.
+- **The new tests fail against the old code** (the new tests, run on a copy of the previous commit): the three "no source under the cutoff" cases (GOLD) and the three ligatures `ﬀ ﬃ ﬄ` fail; every other new rule-order and cleaning test passes, so they pin behaviour that already held.
+- **The refusals, none of which connects anywhere:** `TEST_DATABASE_URL` naming a `neon.tech` host, or the database `compliance`, stops pytest with its message and exit code 1 before any test runs; `CI=true` without `TEST_DATABASE_URL` does the same; `alembic -x db=test` refuses the same URLs, and `-x db=tset` stops.
+- **The ligatures, measured read-only** with `upload.extract_text` on the PDF test set and `gdpr1.pdf`: only `gdpr1.pdf` still held any (4 `ﬀ`, 2 `ﬃ`), and replacing them changed no document's chunk count.
+- **No eval run.** Production's tiers can't change (`answer_question` never let `classify` see an empty list), and the eval corpus is all .txt, so the ligatures never reach it.
+- **The frontend's three CI steps, locally:** `eslint` passes, `package-lock.json` matches `package.json`, and `npm run build` succeeds with the CI's environment.
+- **CI's first runs are on this commit,** so their results are in each repo's Actions tab.

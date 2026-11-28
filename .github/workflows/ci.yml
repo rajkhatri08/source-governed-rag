@@ -1,0 +1,44 @@
+# Runs every test on each push and pull request: the unit tests, and the database tests against a fresh Postgres
+# whose schema is built by the migrations, exactly as a new database would be. No secrets: Gemini is mocked, and the
+# tests pass their own vectors, so the embedding model is never downloaded.
+name: ci
+
+on: [push, pull_request]
+
+permissions:
+  contents: read # check out the code; nothing else
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # A throwaway Postgres that lives only as long as this job, reachable only from it
+      postgres:
+        image: postgres:18 # the major version Neon (production) runs
+        env:
+          POSTGRES_DB: compliance_test
+          POSTGRES_PASSWORD: postgres # a placeholder for this throwaway database, not a secret
+        ports:
+          - 5432:5432
+        # The job waits until Postgres accepts connections
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/compliance_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14" # what Render runs: its build installs cp314 wheels
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      # The schema from the migrations alone: proves a new database can be created from them
+      - run: alembic -x db=test upgrade head
+      # Do the models in db.py match what the migrations built? Fails if a model changed without a migration
+      - run: alembic -x db=test check
+      - run: pytest

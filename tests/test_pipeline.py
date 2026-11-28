@@ -7,7 +7,7 @@ from google.genai import errors
 from sqlalchemy.exc import OperationalError
 
 import pipeline
-from generate import HTTP_OPTIONS
+from fakes import FakeCollection, fake_gemini, reply_with
 from govern import classify, is_approved, source_warnings
 from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id, new_index
 
@@ -23,17 +23,6 @@ RETENTION = {"filename": "retention_policy_v1.txt", "owner": "Data Governance", 
              "approved": True, "review_date": "2023-01-15"}  # past review
 RETENTION_TEXTS = ["Section 1. Scope", "Section 2. Breach Notification", "Section 3. Access Requests"]
 RETENTION_IDS, RETENTION_METAS = pipeline.chunk_ids_and_metadata(RETENTION, RETENTION_TEXTS)
-
-
-class FakeCollection:
-    """Stands in for the Chroma collection: query() returns the given (text, id, distance, metadata) results."""
-
-    def __init__(self, results: list[tuple]):
-        self.results = results
-
-    def query(self, query_texts: list[str], n_results: int) -> dict:
-        return {"documents": [[r[0] for r in self.results]], "ids": [[r[1] for r in self.results]],
-                "distances": [[r[2] for r in self.results]], "metadatas": [[r[3] for r in self.results]]}
 
 
 @pytest.fixture
@@ -112,17 +101,6 @@ def test_a_bug_while_answering_is_not_reported_as_model_unavailable(logged):
         pipeline.answer_question("How fast must a breach be reported?", collection, None, today=TODAY,
                                  generate=broken)
     assert logged == []
-
-
-def fake_gemini(respond) -> genai.Client:
-    """A real Gemini client with production's options, whose requests go to `respond` instead of to Google."""
-    options = HTTP_OPTIONS.model_copy(update={"client_args": {"transport": httpx.MockTransport(respond)}})
-    return genai.Client(api_key="test-key", http_options=options)
-
-
-def reply_with(text: str) -> httpx.Response:
-    """What the Gemini API sends back for a reply holding `text`."""
-    return httpx.Response(200, json={"candidates": [{"content": {"role": "model", "parts": [{"text": text}]}}]})
 
 
 def times_out(request: httpx.Request):

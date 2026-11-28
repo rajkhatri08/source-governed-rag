@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from ingest import MAX_CHUNK_CHARS, chunk_document, chunk_text, clean_text, join_broken_words, load_document
+from ingest import (MAX_CHUNK_CHARS, chunk_document, chunk_text, clean_pdf_text, clean_text, join_broken_words,
+                    load_document)
 
 DOCUMENTS = Path(__file__).parent.parent / "documents"
 FILLER = " ".join(["The controller shall keep a record of this."] * 20)  # 899 characters
@@ -143,3 +144,32 @@ def test_a_section_longer_than_the_cap_is_packed_line_by_line():
     assert max(len(chunk) for chunk in chunks) <= MAX_CHUNK_CHARS
     assert chunks[0].startswith("Retention Policy | Section 1. Scope")
     assert chunks[-1] == "Retention Policy | Section 2. Review\nReviewed yearly."
+
+
+@pytest.mark.parametrize("text, cleaned", [
+    ("ﬁle", "file"),
+    ("ﬂow", "flow"),
+    ("aﬀect", "affect"),  # as gdpr1.pdf reads before this fix
+    ("eﬃcient", "efficient"),
+    ("baﬄe", "baffle"),
+])
+def test_a_ligature_in_a_pdf_becomes_its_letters(text, cleaned):
+    assert clean_pdf_text(text) == cleaned
+
+
+def test_a_line_break_inside_a_sentence_becomes_a_space():
+    assert clean_pdf_text("reported within\nseventy-two hours") == "reported within seventy-two hours"
+
+
+@pytest.mark.parametrize("text", [
+    "Breaches are reported.\nRecords are kept.",  # after a full stop
+    "Scope\nThe policy applies to staff.",  # before a capital: a heading ended, or a sentence starts
+    "the following rights\n2. Access",  # before a digit: a numbered paragraph
+    "the following rights\n(a) access",  # before a bracket: a lettered point
+])
+def test_a_line_break_that_can_end_a_line_on_purpose_is_kept(text):
+    assert clean_pdf_text(text) == text
+
+
+def test_runs_of_spaces_become_one():
+    assert clean_pdf_text("within   72  hours") == "within 72 hours"

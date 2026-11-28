@@ -4,6 +4,7 @@ RELEVANCE_CUTOFF = 1.2
 # What the prompt (generate.py) tells the model to reply when the context doesn't hold the answer. A token no real
 # answer contains, unlike "I don't know", which also appears in answers ("I don't know why the regulator…").
 REFUSAL_SENTINEL = "NO_ANSWER_IN_CONTEXT"
+NO_RELEVANT_SOURCE = "no relevant source in the corpus"  # the reason when no chunk passes the relevance filter
 
 
 def parse_review_date(review_date: str | None) -> date | None:
@@ -60,7 +61,7 @@ def source_warnings(metas: list[dict], today: date | None = None) -> list[str]:
 
 def classify(metas: list[dict], distances: list[float], reply: str,
              today: date | None = None) -> tuple[str, str]:
-    """The tier and its reason, from the ordered rules: refusal, then approval, then review date."""
+    """The tier and its reason, from the ordered rules: refusal, no relevant source, approval, review date."""
     if is_refusal(reply):
         return "BRONZE", "no answer found in the available sources"
 
@@ -68,6 +69,10 @@ def classify(metas: list[dict], distances: list[float], reply: str,
     for meta, distance in zip(metas, distances):
         if distance < RELEVANCE_CUTOFF:
             relevant.append(meta)
+    # Without this, an answer with no relevant source would pass every rule below and come out GOLD (fail closed).
+    # answer_question never asks with no relevant source, but classify mustn't depend on its caller for that.
+    if not relevant:
+        return "BRONZE", NO_RELEVANT_SOURCE
 
     for m in relevant:
         if not is_approved(m):

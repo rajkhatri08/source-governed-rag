@@ -1,14 +1,18 @@
 import logging
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from starlette.datastructures import State
 
 import api
-from db import DuplicateDocument
+from db import DuplicateDocument, read_documents_to_index
+from fakes import FakeCollection, fake_gemini, reply_with
 from pdf_samples import blank_pdf, encrypted_pdf, numbered_sections
-from pipeline import ModelUnavailable
-from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id
+from pipeline import ModelUnavailable, chunk_ids_and_metadata
+from retrieve import EMBEDDING_MODEL, content_hash, make_chunk_id, new_index
 from upload import MAX_CHUNKS, MAX_PAGES, MAX_UPLOAD_BYTES
 
 FIELDS = {"owner": "Operations", "version": "1.0", "review_date": "2027-01-15"}
@@ -230,3 +234,146 @@ def test_health_is_degraded_and_names_a_document_that_failed_to_index(client, ap
     body = client.get("/health").json()
     assert body["status"] == "degraded"
     assert body["failed_documents"] == [failure]
+
+
+@pytest.mark.parametrize("question", ["", "   "])
+def test_an_empty_question_is_400_and_never_reaches_the_model(client, monkeypatch, question):
+    monkeypatch.setattr(api, "answer_question", must_not_be_called)
+    response = client.post("/query", json={"question": question})
+    assert response.status_code == 400
+    assert response.json() == {"detail": "question cannot be empty"}
+
+
+def database_down(*args) -> None:
+    raise OperationalError("SELECT ...", {}, Exception("connection refused"))
+
+
+def test_startup_retries_the_database_while_it_wakes(monkeypatch):
+    attempts, waits = [], []
+
+    def answers_at_the_third_attempt() -> list[dict]:
+        attempts.append(1)
+        if len(attempts) < 3:
+            database_down()
+        return []
+
+    monkeypatch.setattr(api, "read_documents_to_index", answers_at_the_third_attempt)
+    monkeypatch.setattr(api.time, "sleep", waits.append)  # record each wait instead of waiting
+    assert api.read_documents_with_retry() == []
+    assert waits == [1, 2]
+
+
+def test_startup_stops_if_the_database_never_answers(monkeypatch):
+    waits = []
+    monkeypatch.setattr(api, "read_documents_to_index", database_down)
+    monkeypatch.setattr(api.time, "sleep", waits.append)
+    with pytest.raises(OperationalError):  # startup fails, and Render restarts the service
+        api.read_documents_with_retry()
+    assert waits == [1, 2, 4, 8]
+
+
+# From here on, the app on the test database (the `database` fixture in conftest.py): real database calls, a real
+# in-memory index, a fake embedding model. Each test's writes are undone.
+
+@pytest.fixture
+def stored_client(database, monkeypatch) -> TestClient:
+    state = State({"collection": new_index(), "client": None, "indexed_documents": set(), "failed_documents": []})
+    monkeypatch.setattr(api.app, "state", state)
+    monkeypatch.setattr(api, "embed", fake_embed)
+    return TestClient(api.app)
+
+
+def chunks_stored(database) -> int:
+    return database.execute(text("SELECT count(*) FROM document_chunks")).scalar()
+
+
+def listed(client: TestClient) -> dict:
+    """The documents GET /documents lists, by filename."""
+    return {d["filename"]: d for d in client.get("/documents").json()["documents"]}
+
+
+def test_an_upload_is_stored_with_its_vectors_and_listed_unapproved(stored_client, database):
+    assert upload(stored_client, "Retention Policy v2.txt", b"Section 1. Scope\nKeep records.").status_code == 200
+    document = listed(stored_client)["Retention Policy v2.txt"]
+    assert (document["approved"], document["retired"]) == (False, False)
+    assert chunks_stored(database) == 1
+
+
+def test_uploading_the_same_name_twice_is_409_and_keeps_the_first(stored_client, database):
+    assert upload(stored_client, "policy.txt", b"Section 1. Scope").status_code == 200
+    response = upload(stored_client, "policy.txt", b"Section 1. Another scope")
+    assert response.status_code == 409
+    assert response.json() == {"detail": "a document named policy.txt already exists"}
+    assert [d["content"] for d in read_documents_to_index()] == ["Section 1. Scope"]
+    assert chunks_stored(database) == 1
+
+
+def test_a_duplicate_that_slips_past_the_name_check_is_409_from_postgres(stored_client, monkeypatch, database):
+    assert upload(stored_client, "policy.txt", b"Section 1. Scope").status_code == 200
+    monkeypatch.setattr(api, "document_exists", lambda filename: False)  # as when two uploads race
+    response = upload(stored_client, "policy.txt", b"Section 1. Another scope")
+    assert response.status_code == 409
+    assert [d["content"] for d in read_documents_to_index()] == ["Section 1. Scope"]
+    assert chunks_stored(database) == 1
+
+
+def test_if_indexing_fails_the_row_and_its_chunks_are_removed(stored_client, monkeypatch, database):
+    def index(collection, doc, chunks, embeddings):
+        raise RuntimeError("the index refused the chunks")
+
+    monkeypatch.setattr(api, "index_document", index)
+    assert upload(stored_client, "policy.txt", b"Section 1. Scope").status_code == 500
+    assert listed(stored_client) == {}
+    assert chunks_stored(database) == 0
+
+
+def test_approve_and_unapprove_change_the_listed_state(stored_client):
+    name = "Retention Policy v2.txt"  # with spaces, sent encoded, as the dashboard's encodeURIComponent sends it
+    assert upload(stored_client, name, b"Section 1. Scope").status_code == 200
+    assert stored_client.post(f"/documents/{quote(name)}/approve").json() == {"filename": name, "approved": True}
+    assert listed(stored_client)[name]["approved"] is True
+    assert stored_client.post(f"/documents/{quote(name)}/unapprove").json() == {"filename": name, "approved": False}
+    assert listed(stored_client)[name]["approved"] is False
+
+
+def test_retire_marks_the_document_retired(stored_client):
+    assert upload(stored_client, "policy.txt", b"Section 1. Scope").status_code == 200
+    assert stored_client.post("/documents/policy.txt/retire").json() == {"filename": "policy.txt", "retired": True}
+    assert listed(stored_client)["policy.txt"]["retired"] is True
+
+
+@pytest.mark.parametrize("action", ["approve", "unapprove", "retire"])
+def test_a_governance_change_to_an_unknown_document_is_404(stored_client, action):
+    response = stored_client.post(f"/documents/nothing.txt/{action}")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "document not found"}
+
+
+POLICY = {"filename": "policy.txt", "owner": "Operations", "version": "1.0", "approved": True,
+          "review_date": "2099-12-31"}  # far ahead, so the answer stays GOLD whatever today is
+POLICY_TEXT = "Section 2. Breaches\nReport within 72 hours."
+(POLICY_ID,), (POLICY_META,) = chunk_ids_and_metadata(POLICY, [POLICY_TEXT])
+
+
+def test_an_answered_question_is_audited_with_the_chunk_it_used(stored_client):
+    api.app.state.collection = FakeCollection([(POLICY_TEXT, POLICY_ID, 0.785, POLICY_META)])
+    api.app.state.client = fake_gemini(lambda request: reply_with("Within 72 hours."))  # the real SDK, no network
+    answered = stored_client.post("/query", json={"question": "How fast must a breach be reported?"}).json()
+    assert (answered["answer"], answered["tier"]) == ("Within 72 hours.", "GOLD")
+    entry = stored_client.get("/audit").json()["entries"][0]
+    assert (entry["question"], entry["answer"], entry["tier"]) == (
+        "How fast must a breach be reported?", "Within 72 hours.", "GOLD")
+    assert entry["chunks"] == [{"chunk_id": POLICY_ID, "source": "policy.txt",
+                                "content_hash": content_hash(POLICY_TEXT), "distance": 0.785}]
+    assert entry["timestamp"].endswith("+00:00")
+
+
+def test_a_question_with_no_relevant_source_is_audited_without_a_distance(stored_client):
+    api.app.state.collection = FakeCollection([(POLICY_TEXT, POLICY_ID, 1.3, POLICY_META)])
+    assert stored_client.post("/query", json={"question": "Who is our DPO?"}).status_code == 200
+    entry = stored_client.get("/audit").json()["entries"][0]
+    assert (entry["tier"], entry["top_distance"], entry["chunks"]) == ("BRONZE", None, [])
+
+
+def test_health_reports_the_real_database_as_reachable(stored_client):
+    assert stored_client.get("/health").json()["database"] is True

@@ -1,5 +1,7 @@
 # Source-Governed RAG
 
+[![CI](https://github.com/rajkhatri08/source-governed-rag/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rajkhatri08/source-governed-rag/actions/workflows/ci.yml)
+
 A retrieval-augmented generation system for regulatory compliance documents, where **document governance overrides retrieval confidence**.
 
 Most RAG systems answer from whatever text is most semantically similar to the question. This one checks whether that text should be trusted at all — whether the source document is current, and whether anyone approved it — before deciding how much weight to give the answer.
@@ -74,6 +76,7 @@ A chunk's id is `{filename}::{position}::{first 12 characters of the SHA-256 of 
 | `migrate.py` | One-off load of document metadata into Postgres |
 | `backfill_content.py` | Fills the stored text of documents created before it was kept, from the seed files in `documents/` |
 | `backfill_vectors.py` | Stores the vectors of existing documents' chunks, so startup doesn't embed them again |
+| `tests/`, `testdb.py` | The pytest suite; `testdb.py` keeps the tests on the `compliance_test` database and off any other |
 
 ---
 
@@ -103,15 +106,17 @@ The lookahead matches the position before each heading without consuming it, so 
 
 ## Governance is a veto, not a weight
 
-The tier is decided by three checks, in order:
+The tier is decided by these checks, in order:
 
 ```python
-if model_refused:            return BRONZE, "no answer found in the available sources"
-if any_source_unapproved:    return BRONZE, "source not approved: ..."
-if any_source_without_date:  return SILVER, "source has no valid review date, so it counts as past review: ..."
-if any_source_expired:       return SILVER, "source past review date: ..."
-                             return GOLD,   "answered from an approved, current source"
+if model_refused:             return BRONZE, "no answer found in the available sources"
+if no_source_under_cutoff:    return BRONZE, "no relevant source in the corpus"
+if any_source_unapproved:     return BRONZE, "source not approved: ..."
+if any_source_past_review:    return SILVER, "source past review date: ..."   # or "has no valid review date"
+                              return GOLD,   "answered from an approved, current source"
 ```
+
+When more than one source is past review, or has no valid review date, the reason names the first of them in retrieval order; the warnings list every one.
 
 **Unknown counts against the source.** Approved means exactly `True`: `False`, a missing value or `None` all count as unapproved. A missing or unreadable review date counts as past review, and the reason says so. A model refusal is recognised by a token the prompt asks for (`NO_ANSWER_IN_CONTEXT`), not by phrases like "I don't know", which also appear in real answers.
 
@@ -133,7 +138,7 @@ PDF text is extracted with `pypdf` and cleaned in stages:
 - **Page furniture is dropped.** A line at the top or bottom of a page is a header, footer or page number if, with its digits ignored, it repeats there on at least half of all pages, or of the odd or the even pages: printed documents often alternate them.
 - **Pages are joined so that a sentence continuing onto the next page joins up.**
 - **A word hyphenated at a line end is rejoined.**
-- **The PDF-specific stage** normalises ligatures (`ﬁ` → `fi`, `ﬂ` → `fl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
+- **The PDF-specific stage** normalises ligatures (`ﬀ ﬁ ﬂ ﬃ ﬄ` → `ff fi fl ffi ffl`), rejoins lines broken by the PDF's visual layout rather than by sentence structure, and collapses the resulting double spaces.
 
 [docs/eval/pdf_robustness.md](docs/eval/pdf_robustness.md) measures each stage on seven real PDFs.
 
@@ -233,6 +238,16 @@ uvicorn api:app --reload
 
 Interactive docs at `http://127.0.0.1:8000/docs`.
 
+Run the tests. The database tests need an empty database named `compliance_test` (create it once, add `TEST_DATABASE_URL=postgresql://user:password@localhost:5432/compliance_test` to `.env`, then build its schema); without it they are skipped, and the rest still run:
+
+```bash
+pip install -r requirements-dev.txt
+alembic -x db=test upgrade head
+pytest
+```
+
+Each database test runs inside a transaction that is rolled back afterwards, so the database stays empty. GitHub Actions runs the same steps on every push, against a fresh Postgres, and lints and builds the dashboard.
+
 The frontend is a separate repository: [compliance-dashboard](https://github.com/rajkhatri08/compliance-dashboard).
 
 ---
@@ -289,7 +304,7 @@ These are real and worth stating plainly.
 
 **The model can ignore the refusal instruction.** A refusal is recognised by the token the prompt asks for (`NO_ANSWER_IN_CONTEXT`). A model that answers a question its sources don't cover, or refuses in its own words without the token, isn't caught: its reply is shown as an answer and tiered by its sources. In the P0.4 evaluation, each of the model's 14 refusals was the bare token and no answer refused in words ([docs/eval/p0.4.md](docs/eval/p0.4.md)), but that is 41 replies from one model version. A reply that mixes a partial answer with the token is refused, by design.
 
-**Tests don't cover everything yet.** Unit tests cover the evaluation's scoring, the chunker, chunk ids, the audit row, every upload check and PDF-cleaning rule, the use of stored vectors at startup, the refusal check, the fail-closed approval and review-date rules, warnings, the mapping of model failures to 503 (through the real Gemini SDK on a simulated network), the CORS headers on error responses, and the `/upload`, `/query` errors and `/health` endpoints. Nothing yet checks the order of the tier rules as a whole or the approve, revoke, retire and audit endpoints. The unit tests use no database; the database paths were checked by hand against a scratch database.
+**Tests check logic, not answers.** The unit tests cover the tier rules and their order, the refusal check, the chunker, PDF cleaning, every upload check, chunk ids, the audit row, the mapping of model failures to 503 (through the real Gemini SDK on a simulated network) and the CORS headers on error responses. The database tests run against a real Postgres built by the migrations: storing an upload with its vectors, a duplicate refused by the database's own unique constraint, the clean-up after a failed index, the approve, revoke and retire endpoints, and a question's audit row. CI runs them all on every push. Whether an answer is right is the evaluation's job, not the tests'. Still untested: two uploads of one name racing each other (the test reproduces the second insert, not the race), the startup handler as a whole (its parts are tested separately), and the dashboard's behaviour (CI only lints and builds it).
 
 **Heading detection is pattern-based.** The chunker recognises two kinds of heading: a line that is exactly `Art. N GDPR` (a long article is then split at its numbered paragraphs, `1.`, `2.` …) and a line starting `Section N.`. A document structured any other way — "Article 5", "§ 3", "1.1" — gets the fallback: lines packed into chunks of up to 1,000 characters. It splits only between lines, so in a hard-wrapped text file a chunk can end mid-paragraph, and a single line over 1,500 characters is cut into 1,000-character pieces overlapping by 50, wherever the cuts fall.
 

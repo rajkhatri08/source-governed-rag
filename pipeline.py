@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from db import log_query_db, read_stored_vectors
 from generate import generate_answer
-from govern import RELEVANCE_CUTOFF, classify, is_refusal, source_warnings
+from govern import NO_RELEVANT_SOURCE, RELEVANCE_CUTOFF, classify, is_refusal, source_warnings
 from ingest import chunk_document
 from retrieve import EMBEDDING_MODEL, add_to_index, content_hash, embed, make_chunk_id, search
 
@@ -178,7 +178,7 @@ def answer_question(question: str, collection: Collection, client: genai.Client,
         warnings = []
         refused = True
         answer = NO_SOURCE_ANSWER
-        tier, reason = "BRONZE", "no relevant source in the corpus"
+        tier, reason = "BRONZE", NO_RELEVANT_SOURCE
 
     # Each chunk the answer was drawn from, with enough to find its exact text again.
     audit_chunks = [{"chunk_id": chunk_id, "source": meta["source"], "content_hash": meta["content_hash"],
